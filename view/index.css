@@ -1,0 +1,59 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+body, html {
+    height: 100%;
+}
+
+
+.box {
+    float: left;
+    position: relative;
+    left: 0;
+    height: 100%;
+    width: 300px;
+    margin-left: 0;
+    display: block;
+    border-right: 1px solid #000;
+    /*background-color: #0c0b0b;*/
+    -moz-transition: margin-left 2s;
+    transition: margin-left 2s;
+}
+
+aside ul li {
+    height: 40px;
+    line-height: 40px;
+    border-top: 1px solid #fff;
+    border-bottom: 1px solid #fff;
+    list-style-type: none;
+    text-align: center;
+}
+
+aside ul li a {
+    width: 100%;
+    height: 100%;
+    text-decoration-line: none;
+    color: #000;
+    display: block;
+}
+
+aside ul li a:hover {
+    background: #2a80eb;
+}
+
+aside ul li a .active {
+    background: #2a80eb;
+}
+
+section {
+    width: 100%;
+    height: 100%;
+    /*background: #d4d4d4;*/
+}
+
+section h1 {
+    text-align: center;
+    border-bottom: 1px solid #fff;
+}
