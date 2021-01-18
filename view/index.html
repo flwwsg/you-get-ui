@@ -2,23 +2,35 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>you-get</title>
+    <title>b站下载器</title>
     <link rel="stylesheet" type="text/css" href="index.css">
     <link rel="stylesheet" type="text/css" href="../ui/lulu/pure/ui.css">
-    <script type="text/javascript" src="../ui/lulu/pure/all.js"></script>
+    <link rel="stylesheet" href="../ui/lulu/pure/table.css">
 </head>
 <body>
-<aside class="box" id="test">
+<aside class="box">
     <ul>
-        <li>
-            <h3>b站下载器</h3>
-        </li>
-        <li><a href="#">当前下载</a></li>
+        <li><a href="#" class="active">当前下载</a></li>
         <li><a href="#">配置</a></li>
     </ul>
 </aside>
 <section>
 <!--    <h1>Main Content</h1>-->
+    <span class="ui-input ui-input-search" align="right" style="width:75%">
+        <input id="input-url" type="search" class="ui-input" placeholder="请输入网址, 按enter键下载" style="width: 100%">
+        <input type="submit" class="ui-icon-search" value="搜索">
+    </span>
+    <div class="table-x table-checkbox">
+        <table class="ui-table">
+            <tr>
+                <th><input type="checkbox" id="chkAll"><label class="ui-checkbox" for="chkAll"></label></th>
+                <th>视频名称</th>
+                <th width="30%">下载进度</th>
+            </tr>
+        </table>
+    </div>
 </section>
 </body>
+<script type="text/javascript" src="../ui/lulu/pure/all.js"></script>
+<script type="text/javascript" src="index.js"></script>
 </html>
