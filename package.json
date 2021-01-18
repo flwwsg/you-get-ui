@@ -12,6 +12,9 @@
   "license": "ISC",
   "devDependencies": {},
   "dependencies": {
-    "electron": "^11.2.0"
+    "axios": "^0.21.1",
+    "cheerio": "^1.0.0-rc.5",
+    "electron": "^11.2.0",
+    "htmlparser2": "^6.0.0"
   }
 }

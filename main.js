@@ -1,5 +1,5 @@
-const { app, BrowserWindow } = require('electron');
-
+const { app, BrowserWindow, ipcMain } = require('electron');
+const { download } = require('./downloader');
 let mainWindow;
 // 启动app
 app.on('ready', () => {
@@ -8,7 +8,7 @@ app.on('ready', () => {
         show: false,
         webPreferences: {
             nodeIntegration: true,
-            enableRemoteModule: true,
+            // enableRemoteModule: true,
         }
     })
     mainWindow.loadFile(`${__dirname}/view/index.html`);
@@ -18,6 +18,13 @@ app.on('ready', () => {
     mainWindow.openDevTools();
 });
 
-
-
-
+// 从页面接收url
+ipcMain.on('start-download', (event, url) => {
+    console.log(url);
+    download(url).then(res => {
+        mainWindow.webContents.send('finish-download', res);
+    }).catch(err => {
+        console.error(err);
+        mainWindow.webContents.send('error-download', err.message);
+    })
+})
