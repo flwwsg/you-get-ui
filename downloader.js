@@ -297,7 +297,6 @@ async function download(url, currentWindow) {
     if (bestDashStream.size > 0) {
         // 就是你了
         for (let i=0; i<bestDashStream.src.length; i++) {
-            // TODO 多线程下载
             ext = bestDashStream.container;
             // 设置标题
             currentWindow.webContents.send('set-title', title, ext);
