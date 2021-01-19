@@ -21,8 +21,8 @@ app.on('ready', () => {
 // 从页面接收url
 ipcMain.on('start-download', (event, url) => {
     console.log(url);
-    download(url).then(res => {
-        mainWindow.webContents.send('finish-download', res);
+    download(url, mainWindow).then(res => {
+        // mainWindow.webContents.send('error-download', res);
     }).catch(err => {
         console.error(err);
         mainWindow.webContents.send('error-download', err.message);

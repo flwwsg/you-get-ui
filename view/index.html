@@ -8,28 +8,20 @@
     <link rel="stylesheet" href="../ui/lulu/pure/table.css">
 </head>
 <body>
-<aside class="box">
-    <ul>
-        <li><a href="index.html" class="active">当前下载</a></li>
-        <li><a href="config.html">配置</a></li>
-    </ul>
-</aside>
-<section>
 <!--    <h1>Main Content</h1>-->
-    <span class="ui-input ui-input-search" align="right" style="width:75%">
+    <span class="ui-input ui-input-search" align="right" style="width: 50%">
         <input id="input-url" type="search" class="ui-input" placeholder="请输入网址, 按enter键下载" style="width: 100%">
         <input type="submit" class="ui-icon-search" value="搜索">
     </span>
     <div class="table-x table-checkbox">
         <table class="ui-table">
-            <tr>
+            <thead>
                 <th><input type="checkbox" id="chkAll"><label class="ui-checkbox" for="chkAll"></label></th>
                 <th>视频名称</th>
                 <th width="30%">下载进度</th>
-            </tr>
+            </thead>
         </table>
     </div>
-</section>
 </body>
 <script type="text/javascript" src="../ui/lulu/pure/all.js"></script>
 <script type="text/javascript" src="index.js"></script>

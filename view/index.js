@@ -1,10 +1,13 @@
 const { ipcRenderer } = require('electron');
 
 const inputUrl = document.querySelector('#input-url');
-// const search = document.querySelector('.ui-input-search');
 const searchIcon = document.querySelector('.ui-icon-search');
-// 记录提交
+const tbl = document.querySelector('.ui-table');
 
+let count = 1;
+let allFiles = [];
+let title = '';
+let ext = '';
 searchIcon.addEventListener('click', () => {
     console.log('input url by search icon', inputUrl.value);
     inputUrl.readOnly = true;
@@ -12,14 +15,36 @@ searchIcon.addEventListener('click', () => {
     ipcRenderer.send('start-download', inputUrl.value);
 })
 
+ipcRenderer.on('set-title', (event, newTitle, newExt) => {
+    const nextRow = tbl.insertRow();
+    const cellChk = nextRow.insertCell(0);
+    const cellTitle = nextRow.insertCell(1);
+    const cellProgress = nextRow.insertCell(2);
+    const id = 'chk'+count;
+    const progressId = 'progress' + count;
+    title = newTitle;
+    ext = newExt;
+    count++;
+    cellChk.innerHTML = `<td><input type="checkbox" id="${id}"><label class="ui-checkbox" for="${id}"></label></td>`
+    cellTitle.innerHTML = title+'.'+ext;
+    cellProgress.innerHTML = `<progress class="ui-progress" id="${progressId}"></progress>`;
+});
+
+ipcRenderer.on('downloading', (event, index, downloadSize, totalSize) => {
+    const el = document.querySelector(`#progress${index+1}`);
+    el.value = Number(downloadSize/totalSize).toFixed(2);
+});
+
 ipcRenderer.on('error-download', (event, msg) => {
-    alert(msg);
     inputUrl.readOnly = false;
     inputUrl.value = '';
 })
 
-ipcRenderer.on('finish-download', (event, msg) => {
-    alert(msg);
-    inputUrl.readOnly = false;
-    inputUrl.value = '';
-})
+ipcRenderer.on('finish-download', (event, filepath) => {
+    allFiles.push(filepath);
+    if (allFiles.length === count-1) {
+        inputUrl.readOnly = false;
+        inputUrl.value = '';
+        ipcRenderer.send('merge-movie', allFiles, title, ext);
+    }
+});

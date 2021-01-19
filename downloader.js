@@ -5,6 +5,7 @@ const htmlparser2 = require('htmlparser2');
 const crypto = require('crypto');
 const path = require('path');
 const { spawn } = require('child_process');
+const { ipcMain } = require('electron');
 
 // 流媒体类型
 const streamTypes = [
@@ -107,7 +108,7 @@ const bilibiliInterfaceApi = async function(cid, qn) {
 }
 
 
-async function download(url) {
+async function download(url, currentWindow) {
     // check url is bilibili
     if (!url.startsWith('https://www.bilibili.com/video')) {
         throw new Error(`${url} does not supported`);
@@ -153,7 +154,6 @@ async function download(url) {
     if (pn > 1) {
         title = `${title}-P${p}-${initialState.videoData.pages[p-1].part}`;
     }
-    console.log(`title is ${title}`);
 
     // construct playInfo
     const avid = initialState.aid;
@@ -299,14 +299,21 @@ async function download(url) {
         for (let i=0; i<bestDashStream.src.length; i++) {
             // TODO 多线程下载
             ext = bestDashStream.container;
+            // 设置标题
+            currentWindow.webContents.send('set-title', title, ext);
             const downloadUrl = bestDashStream.src[i][0];
             const tmpFile = path.join(__dirname, title+`[${i}].`+ext);
             allFiles.push(tmpFile);
-            await saveContent(downloadUrl, tmpFile, headers)
+            await saveContent(currentWindow, i, downloadUrl, tmpFile, headers)
         }
     } else {
         // TODO download flv
     }
+    return allFiles;
+}
+
+// 合并视频
+async function merge(allFiles, title, ext) {
     if (allFiles.length > 1) {
         // 需要版本 > 2
         const out = path.join(__dirname, title + `.` + ext);
@@ -325,14 +332,15 @@ async function download(url) {
             console.log(data.toString());
         })
     }
-
 }
-//
-// main().then(res => {
-//     console.log(res);
-// }).catch(e => {
-//     console.error(e);
-// })
+
+ipcMain.on('merge-movie', (event, files, title, ext) =>{
+    merge(files, title, ext).then(res => {
+        console.log(res);
+    }).catch(err => {
+        console.error(err);
+    })
+})
 
 module.exports = {
     download,
