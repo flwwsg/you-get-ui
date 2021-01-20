@@ -20,8 +20,9 @@ const getContent = async function (url, headers) {
  * 请求头，加上 referer， cookie
  * @param referer
  * @param cookie
+ * @param origin
  */
-const buildHeaders = async function (referer, cookie) {
+const buildHeaders = async function (referer, cookie, origin) {
     const ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Safari/537.36';
     const headers = {Accept: '*/*', 'Accept-Language': 'en-US,en;q=0.5', 'User-Agent': ua};
     if (undefined !== referer && referer !== null) {
@@ -29,6 +30,9 @@ const buildHeaders = async function (referer, cookie) {
     }
     if (undefined !== cookie && referer !== null) {
         headers.Cookie = cookie;
+    }
+    if (undefined !== origin && origin !== null) {
+        headers.Origin = origin;
     }
     return headers;
 }

@@ -3,6 +3,7 @@ const { ipcRenderer } = require('electron');
 const inputUrl = document.querySelector('#input-url');
 const searchIcon = document.querySelector('.ui-icon-search');
 const tbl = document.querySelector('.ui-table');
+const loginAction = document.querySelector('#login');
 
 let count = 1;
 let allFiles = [];
@@ -13,6 +14,11 @@ searchIcon.addEventListener('click', () => {
     inputUrl.readOnly = true;
     // start download
     ipcRenderer.send('start-download', inputUrl.value);
+})
+
+loginAction.addEventListener('click', (event) => {
+    event.preventDefault();
+    ipcRenderer.send('login');
 })
 
 ipcRenderer.on('set-title', (event, newTitle, newExt) => {
@@ -47,4 +53,10 @@ ipcRenderer.on('finish-download', (event, filepath) => {
         inputUrl.value = '';
         ipcRenderer.send('merge-movie', allFiles, title, ext);
     }
+});
+
+// 登录成功, 构建 cookie, header
+ipcRenderer.on('login-success', (event, uname) => {
+    console.log('hi', uname);
+    loginAction.innerHTML = 'hi, '+uname;
 });
