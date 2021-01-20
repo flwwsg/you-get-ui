@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, session } = require('electron');
 const { download } = require('./downloader');
 const { getContent, buildHeaders } = require('./utils/net');
 let mainWindow;
+// 貌似不需要 cookies 也能下载高清视频...,这就很尴尬了
 let cookies;
 // 启动app
 app.on('ready', () => {
@@ -17,7 +18,6 @@ app.on('ready', () => {
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
     })
-    mainWindow.openDevTools();
 });
 
 // 从页面接收url
@@ -79,6 +79,7 @@ function getUsername() {
             }
         })
         cookies = list.join('; ');
+        console.log(cookies);
         buildHeaders('https://www.bilibili.com', cookies).then( res => {
             getContent('https://api.bilibili.com/x/web-interface/nav', res).then( data => {
                 mainWindow.webContents.send('login-success', data.data.uname);

@@ -288,8 +288,8 @@ async function download(url, currentWindow) {
             bestDashStream = {...ds, id: k};
         }
     }
-    console.log(streams);
-    console.log(dashStreams);
+    // console.log(streams);
+    // console.log(dashStreams);
     console.log(bestStream, bestDashStream);
     headers = await buildHeaders(url);
     const allFiles = [];
@@ -303,7 +303,7 @@ async function download(url, currentWindow) {
             const downloadUrl = bestDashStream.src[i][0];
             const tmpFile = path.join(__dirname, title+`[${i}].`+ext);
             allFiles.push(tmpFile);
-            await saveContent(currentWindow, i, downloadUrl, tmpFile, headers)
+            await saveContent(currentWindow, i, downloadUrl, tmpFile, headers);
         }
     } else {
         // TODO download flv
