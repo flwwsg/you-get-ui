@@ -152,7 +152,7 @@ async function download(url, currentWindow) {
     // TODO check play list
     let title = initialState.videoData.title;
     if (pn > 1) {
-        title = `${title}-P${p}-${initialState.videoData.pages[p-1].part}`;
+        title = `${title}${initialState.videoData.pages[p-1].part}`;
     }
 
     // construct playInfo
