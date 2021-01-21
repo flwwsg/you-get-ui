@@ -1,6 +1,8 @@
-const { app, BrowserWindow, ipcMain, session } = require('electron');
+const { app, BrowserWindow, ipcMain, session, dialog } = require('electron');
 const { download } = require('./downloader');
 const { getContent, buildHeaders } = require('./utils/net');
+const fs = require('fs');
+
 let mainWindow;
 // 貌似不需要 cookies 也能下载高清视频...,这就很尴尬了
 let cookies;
@@ -17,6 +19,7 @@ app.on('ready', () => {
     mainWindow.loadFile(`${__dirname}/view/index.html`);
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
+        mainWindow.openDevTools();
     })
 });
 
@@ -68,6 +71,17 @@ ipcMain.on('login', () => {
         });
     })
     loginWindow.openDevTools();
+})
+
+ipcMain.on('update-path', async () => {
+    const files = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openDirectory'],
+    });
+    if (files.canceled) {
+        return;
+    }
+    // 通知页面保存文件路径
+    mainWindow.webContents.send('render-save-path', files.filePaths[0]);
 })
 
 function getUsername() {

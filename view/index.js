@@ -4,11 +4,20 @@ const inputUrl = document.querySelector('#input-url');
 const searchIcon = document.querySelector('.ui-icon-search');
 const tbl = document.querySelector('.ui-table');
 const loginAction = document.querySelector('#login');
+const hello = document.querySelector('#hello');
+const updatePath = document.querySelector('#updatePathBtn');
+const currentPath = document.querySelector('#currentPath');
 
 let count = 1;
 let allFiles = [];
 let title = '';
 let ext = '';
+// update current path
+if (localStorage.getItem('savePath')) {
+    currentPath.innerHTML = localStorage.getItem('savePath');
+} else {
+    currentPath.innerHTML = '视频默认保存在当前目录,点击按钮更新路径'
+}
 searchIcon.addEventListener('click', () => {
     console.log('input url by search icon', inputUrl.value);
     inputUrl.readOnly = true;
@@ -19,6 +28,16 @@ searchIcon.addEventListener('click', () => {
 loginAction.addEventListener('click', (event) => {
     event.preventDefault();
     ipcRenderer.send('login');
+})
+
+// 打开文件保存对话框
+updatePath.addEventListener('click', () => {
+    ipcRenderer.send('update-path');
+})
+
+ipcRenderer.on('render-save-path', (event, filePath) => {
+    localStorage.setItem('savePath', filePath);
+    currentPath.innerHTML = filePath;
 })
 
 ipcRenderer.on('set-title', (event, newTitle, newExt) => {
@@ -57,6 +76,10 @@ ipcRenderer.on('finish-download', (event, filepath) => {
 
 // 登录成功, 构建 cookie, header
 ipcRenderer.on('login-success', (event, uname) => {
-    console.log('hi', uname);
-    loginAction.innerHTML = 'hi, '+uname;
+    // 移除登录按钮
+    loginAction.parentNode.removeChild(loginAction);
+    hello.innerHTML =  'hi, '+uname;
+
 });
+
+const mixTable = new Table(tbl, {});

@@ -4,26 +4,42 @@
     <meta charset="UTF-8">
     <title>b站下载器</title>
     <link rel="stylesheet" type="text/css" href="index.css">
-    <link rel="stylesheet" type="text/css" href="../ui/lulu/pure/ui.css">
-    <link rel="stylesheet" href="../ui/lulu/pure/table.css">
+    <link rel="stylesheet" type="text/css" href="../ui/lulu/pure/css/common/ui.css">
+    <link rel="stylesheet" type="text/css" href="../ui/lulu/pure/css/common/color.css">
+    <link rel="stylesheet" type="text/css" href="../ui/lulu/pure/css/common/animate.css">
 </head>
 <body>
-<!--    <h1>Main Content</h1>-->
+<!--    在 electron 中按钮之间默认没有间隙,手动添加-->
     <span class="ui-input ui-input-search" align="right" style="width: 50%">
         <input id="input-url" type="search" class="ui-input" placeholder="请输入网址, 按enter键下载" style="width: 100%">
         <input type="submit" class="ui-icon-search" value="搜索">
     </span>
-    <span><a href="#" id="login">登录</a></span>
+    <span><button class="ui-button" data-type="primary" id="login" style="margin-left: 20%">登录</button></span>
+    <span id="hello" style="margin-left: 20%"></span>
+    <p>
+        <button class="ui-button" data-type="danger" id="delBtn">删除</button>
+        <button class="ui-button" data-type="primary" id="clearBtn">从列表清除</button>
+        <button class="ui-button" data-type="primary" id="updatePathBtn">更新当前保存路径</button>
+        <span class="green" id="currentPath" style="display: inline; font-size: 25px; margin-left: 10px">xxxx</span>
+    </p>
     <div class="table-x table-checkbox">
         <table class="ui-table">
             <thead>
                 <th><input type="checkbox" id="chkAll"><label class="ui-checkbox" for="chkAll"></label></th>
                 <th>视频名称</th>
-                <th width="30%">下载进度</th>
+                <th style="width: 30%">下载进度</th>
             </thead>
+            <tbody>
+            <tr>
+                <td><input type="checkbox" id="${id}"><label class="ui-checkbox" for="${id}"></label></td>
+                <td>视频名称</td>
+                <td><progress class="ui-progress" id="${progressId}"></progress></td>
+            </tr>
+            </tbody>
         </table>
     </div>
 </body>
-<script type="text/javascript" src="../ui/lulu/pure/all.js"></script>
+<!--分开引入,方便改写 js-->
+<script type="text/javascript" src="../ui/lulu/pure/js/common/comp/Table.js"></script>
 <script type="text/javascript" src="index.js"></script>
 </html>
