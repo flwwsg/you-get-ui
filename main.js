@@ -1,11 +1,18 @@
 const { app, BrowserWindow, ipcMain, session, dialog } = require('electron');
-const { download } = require('./downloader');
+const { download, getVideoInfo, merge } = require('./downloader');
 const { getContent, buildHeaders } = require('./utils/net');
 const fs = require('fs');
 
 let mainWindow;
 // 貌似不需要 cookies 也能下载高清视频...,这就很尴尬了
 let cookies;
+// 需要下载的视频
+let needDownload = [];
+// 已经下载好的视频
+let downloaded = []
+let baseUrl = '';
+let watcher;
+let isDownloading = false;
 // 启动app
 app.on('ready', () => {
     // createWindow
@@ -14,7 +21,9 @@ app.on('ready', () => {
         webPreferences: {
             nodeIntegration: true,
             // enableRemoteModule: true,
-        }
+        },
+        width: 1500,
+        height: 2000,
     })
     mainWindow.loadFile(`${__dirname}/view/index.html`);
     mainWindow.once('ready-to-show', () => {
@@ -24,13 +33,46 @@ app.on('ready', () => {
 });
 
 // 从页面接收url
-ipcMain.on('start-download', (event, url) => {
+ipcMain.on('get-video-info', async (event, url) => {
     console.log(url);
-    download(url, mainWindow).then(res => {
-        // mainWindow.webContents.send('error-download', res);
+    const res = await getVideoInfo(url);
+    if (res) {
+        const title = res.title;
+        const parts = res.parts;
+        baseUrl = res.baseUrl;
+        mainWindow.webContents.send('set-titles', parts, title);
+    } else {
+        await dialog.showMessageBox(mainWindow, {
+            title: 'tips',
+            message: '不支持的地址',
+        });
+        mainWindow.webContents.send('error-download');
+    }
+})
+
+// 下载所选
+ipcMain.on('download-selected', async (event, title, pList) => {
+    pList.forEach(item => {
+        if (!downloaded.includes(item)) {
+            needDownload.push(item);
+        }
+    });
+    if (needDownload.length > 0 && !isDownloading) {
+        const next = needDownload.shift();
+        await download(baseUrl+'?p='+needDownload.shift(), title, next, mainWindow)
+    }
+})
+
+
+ipcMain.on('merge-movie', (event, files, title, ext) =>{
+    merge(files, title, ext).then(res => {
+        if (needDownload.length > 0) {
+            const next = needDownload.shift();
+           download(baseUrl+'?p='+next, title, next, mainWindow).then(res => {
+           });
+        }
     }).catch(err => {
         console.error(err);
-        mainWindow.webContents.send('error-download', err.message);
     })
 })
 

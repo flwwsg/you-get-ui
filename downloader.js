@@ -107,12 +107,40 @@ const bilibiliInterfaceApi = async function(cid, qn) {
     return `https://interface.bilibili.com/v2/playurl?${params}&sign=${chkSum}`;
 }
 
-
-async function download(url, currentWindow) {
-    // check url is bilibili
-    if (!url.startsWith('https://www.bilibili.com/video')) {
-        throw new Error(`${url} does not supported`);
+/**
+ * 从 url 获取视频
+ * @returns {Promise<{baseUrl, parts: *, title}>}
+ */
+async function getVideoInfo(url) {
+    // TODO support av
+    const ex = new RegExp(/https?:\/\/(www.)?bilibili.com\/video\/(BV(\S+))/);
+    if (!ex.exec(url)) {
+        return;
     }
+    // 支持
+    const baseUrl = url.split('?')[0];
+    // get initial_state and playInfo
+    let headers = await buildHeaders();
+    let htmlContent = await getContent(url, headers);
+    // console.log(httpContent);
+    let dom = htmlparser2.parseDocument(htmlContent);
+    let root = cheerio.load(dom);
+    const initialState = await getInitialState(root);
+    const playInfo = await getPlayInfo(root);
+
+    if (!initialState || !playInfo) {
+        console.error('get initialState or playInfo error');
+        process.exit(1);
+    }
+    // 解析所有的视频标题
+    const parts = initialState.videoData.pages.map(val => {
+        return val.part;
+    });
+    return { baseUrl, parts, title: initialState.videoData.title };
+
+}
+
+async function download(url, title, p, currentWindow) {
     // get initial_state and playInfo
     let headers = await buildHeaders();
     let htmlContent = await getContent(url, headers);
@@ -141,16 +169,13 @@ async function download(url, currentWindow) {
     }
     // 总集数
     const pn = initialState.videoData.videos;
-    console.log('total number of video', pn);
 
-    // 查找集数
-    const p = parseInt(/.*?p=(\d+)/.exec(url)[1]);
-    console.log(JSON.stringify(initialState));
-    console.log(JSON.stringify(playInfo));
-    console.log(JSON.stringify(playInfo2));
+    // // 查找集数
+    // console.log(JSON.stringify(initialState));
+    // console.log(JSON.stringify(playInfo));
+    // console.log(JSON.stringify(playInfo2));
 
     // TODO check play list
-    let title = initialState.videoData.title;
     if (pn > 1) {
         title = `${title}${initialState.videoData.pages[p-1].part}`;
     }
@@ -298,8 +323,6 @@ async function download(url, currentWindow) {
         // 就是你了
         for (let i=0; i<bestDashStream.src.length; i++) {
             ext = bestDashStream.container;
-            // 设置标题
-            currentWindow.webContents.send('set-title', title, ext);
             const downloadUrl = bestDashStream.src[i][0];
             const tmpFile = path.join(__dirname, title+`[${i}].`+ext);
             allFiles.push(tmpFile);
@@ -333,14 +356,9 @@ async function merge(allFiles, title, ext) {
     }
 }
 
-ipcMain.on('merge-movie', (event, files, title, ext) =>{
-    merge(files, title, ext).then(res => {
-        console.log(res);
-    }).catch(err => {
-        console.error(err);
-    })
-})
 
 module.exports = {
     download,
+    getVideoInfo,
+    merge,
 }

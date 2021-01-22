@@ -7,11 +7,34 @@ const loginAction = document.querySelector('#login');
 const hello = document.querySelector('#hello');
 const updatePath = document.querySelector('#updatePathBtn');
 const currentPath = document.querySelector('#currentPath');
+const videoTitle = document.querySelector('#videoTitle');
+const updateVideoTitle = document.querySelector('#updateVideoTitle');
+const downloadBtn = document.querySelector('#downloadBtn');
 
 let count = 1;
 let allFiles = [];
 let title = '';
 let ext = '';
+let checked = [];
+const mixTable = new Table(tbl, {
+    onCheck: function ( isAllChecked, isAllUnchecked, eleCheckbox, eleAllTdCheckbox) {
+        // console.log( isAllChecked, isAllUnchecked, eleCheckbox, eleCheckbox.checked);
+        downloadBtn.disabled = false;
+        checked = [];
+        for (const ele of eleAllTdCheckbox) {
+            if (ele.checked) {
+                checked.push(ele.id.slice(3));
+            }
+        }
+        console.log(checked);
+    }
+});
+
+downloadBtn.addEventListener('click', () => {
+    downloadBtn.disabled = true;
+    ipcRenderer.send('download-selected', videoTitle.innerHTML, checked);
+});
+
 // update current path
 if (localStorage.getItem('savePath')) {
     currentPath.innerHTML = localStorage.getItem('savePath');
@@ -22,7 +45,7 @@ searchIcon.addEventListener('click', () => {
     console.log('input url by search icon', inputUrl.value);
     inputUrl.readOnly = true;
     // start download
-    ipcRenderer.send('start-download', inputUrl.value);
+    ipcRenderer.send('get-video-info', inputUrl.value);
 })
 
 loginAction.addEventListener('click', (event) => {
@@ -38,21 +61,23 @@ updatePath.addEventListener('click', () => {
 ipcRenderer.on('render-save-path', (event, filePath) => {
     localStorage.setItem('savePath', filePath);
     currentPath.innerHTML = filePath;
-})
+});
 
-ipcRenderer.on('set-title', (event, newTitle, newExt) => {
-    const nextRow = tbl.insertRow();
-    const cellChk = nextRow.insertCell(0);
-    const cellTitle = nextRow.insertCell(1);
-    const cellProgress = nextRow.insertCell(2);
-    const id = 'chk'+count;
-    const progressId = 'progress' + count;
-    title = newTitle;
-    ext = newExt;
-    count++;
-    cellChk.innerHTML = `<td><input type="checkbox" id="${id}"><label class="ui-checkbox" for="${id}"></label></td>`
-    cellTitle.innerHTML = title+'.'+ext;
-    cellProgress.innerHTML = `<progress class="ui-progress" id="${progressId}"></progress>`;
+ipcRenderer.on('set-titles', (event, parts, title) => {
+    let index = 0;
+    parts.forEach(ele => {
+        index++;
+        const nextRow = tbl.insertRow();
+        const cellChk = nextRow.insertCell(0);
+        const cellTitle = nextRow.insertCell(1);
+        const cellProgress = nextRow.insertCell(2);
+        const id = 'chk'+index;
+        const progressId = 'progress' + index;
+        cellChk.innerHTML = `<td><input type="checkbox" id="${id}"><label class="ui-checkbox" for="${id}"></label></td>`
+        cellTitle.innerHTML = ele;
+        cellProgress.innerHTML = `<progress class="ui-progress" id="${progressId}"></progress>`;
+    });
+    videoTitle.innerHTML = title;
 });
 
 ipcRenderer.on('downloading', (event, index, downloadSize, totalSize) => {
@@ -67,10 +92,11 @@ ipcRenderer.on('error-download', (event, msg) => {
 
 ipcRenderer.on('finish-download', (event, filepath) => {
     allFiles.push(filepath);
-    if (allFiles.length === count-1) {
+    if (allFiles.length === 2) {
         inputUrl.readOnly = false;
         inputUrl.value = '';
-        ipcRenderer.send('merge-movie', allFiles, title, ext);
+        // TODO 临时处理
+        ipcRenderer.send('merge-movie', allFiles, 'TODO', 'mp4');
     }
 });
 
@@ -81,5 +107,3 @@ ipcRenderer.on('login-success', (event, uname) => {
     hello.innerHTML =  'hi, '+uname;
 
 });
-
-const mixTable = new Table(tbl, {});
