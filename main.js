@@ -1,3 +1,4 @@
+// const log = require('why-is-node-running');
 const { app, BrowserWindow, ipcMain, session, dialog } = require('electron');
 const { download, getVideoInfo, merge } = require('./downloader');
 const { getContent, buildHeaders, saveContent } = require('./utils/net');
@@ -236,3 +237,8 @@ function getUsername() {
 process.on('uncaughtException', function (err) {
     console.error(err.stack);
 })
+
+// 检测保存运行node的进程
+// setTimeout(function () {
+//     log() // logs out active handles that are keeping node running
+// }, 10000)
