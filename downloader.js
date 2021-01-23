@@ -310,8 +310,7 @@ async function download(url, title, p, currentWindow) {
 async function merge(allFiles, saveName) {
     if (allFiles.length > 1) {
         // 需要版本 > 2
-        const list = allFiles.join(' -i ');
-        console.debug('saving file at', saveName, allFiles, list);
+        // console.debug('saving file at', saveName, allFiles);
         const args = [ '-y' ];
         for (const f of allFiles) {
             args.push('-i');
