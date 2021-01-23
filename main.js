@@ -95,7 +95,7 @@ async function downloadP() {
         if (remain < 1) {
             return;
         }
-        for(let i = 0; i < remain; i++) {
+        for(let r = 0; r < remain; r++) {
             const next = needDownload.shift();
             const downloadUrl = baseUrl+'?p='+next;
             console.debug('downloading', downloadUrl);
@@ -112,9 +112,9 @@ async function downloadP() {
             };
             // bestSource = { container: '扩展名', quality: '品质', src: [[下载地址列表]], size: 总大小 }
             const bestSource = await retryDownload(next, download, downloadUrl, title, parseInt(next), mainWindow);
-            if (!bestSource) {
+            if (bestSource === null || bestSource.size === 0) {
                 // 跳过这个视频
-                i--;
+                r--;
                 continue;
             }
             downloading[next].totalSize = bestSource.size;
@@ -138,7 +138,7 @@ async function downloadP() {
 async function retryDownload(next, cb, ...args) {
     for (let i = 0; i < 5; i++) {
         try {
-            console.debug('try', i, 'times')
+            console.debug('try', next, i, 'times')
             const bestSource = await cb(...args);
             if (bestSource) {
                 return bestSource;
@@ -186,7 +186,7 @@ ipcMain.on('login', () => {
         const waitForLogin = setInterval(() => {
             const nextUrl = loginWindow.webContents.getURL();
             const agent = loginWindow.webContents.getUserAgent();
-            console.log(nextUrl, agent);
+            // console.log(nextUrl, agent);
             if (nextUrl === url) {
                 // 未登录
                 console.log('please login...');

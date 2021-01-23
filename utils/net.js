@@ -52,34 +52,28 @@ const getSize = async function(url, headers) {
 
 
 const retrySaveContent = async function(currentWindow, index, url, urlHeaders, conf, cb) {
-    for (let i = 0; i < 5; i++) {
-        try {
-            const { data } = await axios({
-                url,
-                method: 'GET',
-                responseType: 'stream',
-                headers: urlHeaders,
-            });
-            const filepath = conf.filePath[index];
-            data.on('data', chunk => {
-                conf.partial[index] += chunk.length;
-                let s = 0;
-                conf.partial.forEach( val => s += val);
-                // console.debug(`downloading ${s/conf.totalSize}`);
-                currentWindow.webContents.send('downloading', conf.p, s, conf.totalSize);
-            });
+    const { data } = await axios({
+        url,
+        method: 'GET',
+        responseType: 'stream',
+        headers: urlHeaders,
+    });
+    const filepath = conf.filePath[index];
+    data.on('data', chunk => {
+        conf.partial[index] += chunk.length;
+        let s = 0;
+        conf.partial.forEach( val => s += val);
+        // console.debug(`downloading ${s/conf.totalSize}`);
+        currentWindow.webContents.send('downloading', conf.p, s, conf.totalSize);
+    });
 
-            const writer = fs.createWriteStream(filepath);
-            data.pipe(writer)
-            writer.on('finish', () => {
-                cb(conf.p).then(res => {
-                    console.debug(res);
-                });
-            })
-        } catch (e) {
-            console.error('download fail, retry now\n', e);
-        }
-    }
+    const writer = fs.createWriteStream(filepath);
+    data.pipe(writer)
+    writer.on('finish', () => {
+        cb(conf.p).then(res => {
+            console.debug(res);
+        });
+    })
 }
 
 module.exports = {
