@@ -115,7 +115,6 @@ async function downloadP() {
                 ((v, i) => `${saveDir}/${title}[${i}]${partsName[next]}.${ext}`));
             downloading[next].saveName = `${saveDir}/${title}${partsName[next]}.${ext}`;
             for (let i = 0; i < bestSource.src.length; i++) {
-                // TODO support saving path
                 await saveContent(mainWindow, i, bestSource.src[i][0], headers, downloading[next], mergeMovie);
             }
         }
