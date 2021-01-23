@@ -63,7 +63,6 @@ const retrySaveContent = async function(currentWindow, index, url, urlHeaders, c
         conf.partial[index] += chunk.length;
         let s = 0;
         conf.partial.forEach( val => s += val);
-        // console.debug(`downloading ${s/conf.totalSize}`);
         currentWindow.webContents.send('downloading', conf.p, s, conf.totalSize);
     });
 
@@ -71,7 +70,7 @@ const retrySaveContent = async function(currentWindow, index, url, urlHeaders, c
     data.pipe(writer)
     writer.on('finish', () => {
         cb(conf.p).then(res => {
-            console.debug(res);
+            console.debug('write success', filepath);
         });
     })
 }
