@@ -77,9 +77,9 @@ ipcMain.on('download-selected', async (event, videoTitle, pList, parts) => {
 })
 
 async function downloadP() {
-    // 同时下载的个数为3
+    // 同时下载的个数为1, 多个下载会死机... FIXME
     if (needDownload.length > 0) {
-        const remain = 3 - Object.keys(downloading).length;
+        const remain = 1 - Object.keys(downloading).length;
         if (remain < 1) {
             return;
         }
