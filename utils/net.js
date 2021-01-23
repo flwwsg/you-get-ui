@@ -48,28 +48,28 @@ const getSize = async function(url, headers) {
     return parseInt(size);
 }
 
-const saveContent = async function(currentWindow, index, url, filepath, urlHeaders, method) {
-    if (undefined === method || method === null) {
-        method = 'GET'
-    }
-    const { data, headers } = await axios({
+const saveContent = async function(currentWindow, index, url, urlHeaders, conf, cb) {
+    const { data } = await axios({
         url,
-        method,
+        method: 'GET',
         responseType: 'stream',
         headers: urlHeaders,
     });
-    const totalSize = parseInt(headers['content-length']);
-    let downloadSize = 0;
+    const filepath = conf.filePath[index];
     data.on('data', chunk => {
-        downloadSize += chunk.length;
-        console.log(`downloading progress ${downloadSize/totalSize}`);
-        currentWindow.webContents.send('downloading', index, downloadSize, totalSize, filepath);
+        conf.partial[index] += chunk.length;
+        let s = 0;
+        conf.partial.forEach( val => s += val);
+        // console.debug(`downloading ${s/conf.totalSize}`);
+        currentWindow.webContents.send('downloading', conf.p, s, conf.totalSize);
     });
 
     const writer = fs.createWriteStream(filepath);
     data.pipe(writer)
     writer.on('finish', () => {
-        currentWindow.webContents.send('finish-download', filepath);
+        cb(conf.p).then(res => {
+            console.debug(res);
+        });
     })
 }
 

@@ -3,9 +3,8 @@ const { getContent, buildHeaders, getSize, saveContent } = require('./utils/net'
 const cheerio = require('cheerio');
 const htmlparser2 = require('htmlparser2');
 const crypto = require('crypto');
-const path = require('path');
 const { spawn } = require('child_process');
-const { ipcMain } = require('electron');
+const fs = require('fs');
 
 // 流媒体类型
 const streamTypes = [
@@ -140,6 +139,14 @@ async function getVideoInfo(url) {
 
 }
 
+/**
+ * get download url
+ * @param url
+ * @param title
+ * @param p
+ * @param currentWindow
+ * @returns {Promise<{size: number}>}
+ */
 async function download(url, title, p, currentWindow) {
     // get initial_state and playInfo
     let headers = await buildHeaders();
@@ -175,10 +182,10 @@ async function download(url, title, p, currentWindow) {
     // console.log(JSON.stringify(playInfo));
     // console.log(JSON.stringify(playInfo2));
 
-    // TODO check play list
-    if (pn > 1) {
-        title = `${title}${initialState.videoData.pages[p-1].part}`;
-    }
+    // // TODO check play list
+    // if (pn > 1) {
+    //     title = `${title}${initialState.videoData.pages[p-1].part}`;
+    // }
 
     // construct playInfo
     const avid = initialState.aid;
@@ -313,45 +320,52 @@ async function download(url, title, p, currentWindow) {
             bestDashStream = {...ds, id: k};
         }
     }
-    // console.log(streams);
-    // console.log(dashStreams);
-    console.log(bestStream, bestDashStream);
-    headers = await buildHeaders(url);
-    const allFiles = [];
-    let ext;
+    // console.debug(streams);
+    // console.debug(dashStreams);
+    // console.debug(bestStream, bestDashStream);
+    // headers = await buildHeaders(url);
+    // const allFiles = [];
+    // let ext;
     if (bestDashStream.size > 0) {
-        // 就是你了
-        for (let i=0; i<bestDashStream.src.length; i++) {
-            ext = bestDashStream.container;
-            const downloadUrl = bestDashStream.src[i][0];
-            const tmpFile = path.join(__dirname, title+`[${i}].`+ext);
-            allFiles.push(tmpFile);
-            await saveContent(currentWindow, i, downloadUrl, tmpFile, headers);
-        }
+        return bestDashStream;
+        // // 就是你了
+        // for (let i=0; i<bestDashStream.src.length; i++) {
+        //     ext = bestDashStream.container;
+        //     const downloadUrl = bestDashStream.src[i][0];
+        //     const tmpFile = path.join(__dirname, title+`[${i}].`+ext);
+        //     allFiles.push(tmpFile);
+        //     await saveContent(currentWindow, i, downloadUrl, tmpFile, headers);
+        // }
     } else {
         // TODO download flv
     }
-    return allFiles;
+    return null;
 }
 
 // 合并视频
-async function merge(allFiles, title, ext) {
+async function merge(allFiles, saveName) {
     if (allFiles.length > 1) {
         // 需要版本 > 2
-        const out = path.join(__dirname, title + `.` + ext);
         const list = allFiles.join(' -i ');
-        console.log(out, allFiles, list);
+        console.debug('saving file at', saveName, allFiles, list);
         const args = [];
         for (const f of allFiles) {
             args.push('-i');
             args.push(f);
         }
-        const result = spawn('ffmpeg', [...args, '-c', 'copy', '-bsf:a', 'aac_adtstoasc','--', out]);
+        const result = spawn('ffmpeg', [...args, '-c', 'copy', '-bsf:a', 'aac_adtstoasc','--', saveName]);
         result.stderr.on('data', data => {
-            console.log(data.toString());
+            console.debug(data.toString());
         })
         result.stdout.on('data', data => {
-            console.log(data.toString());
+            console.debug(data.toString());
+        })
+        // 退出时删除临时文件
+        result.on('close', code => {
+            // 删除临时文件
+            allFiles.forEach(elem => {
+                fs.unlinkSync(elem);
+            })
         })
     }
 }

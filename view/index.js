@@ -16,14 +16,19 @@ let allFiles = [];
 let title = '';
 let ext = '';
 let checked = [];
+const partsName = {};
+let checkedParts = [];
 const mixTable = new Table(tbl, {
     onCheck: function ( isAllChecked, isAllUnchecked, eleCheckbox, eleAllTdCheckbox) {
         // console.log( isAllChecked, isAllUnchecked, eleCheckbox, eleCheckbox.checked);
         downloadBtn.disabled = false;
         checked = [];
+        checkedParts = [];
         for (const ele of eleAllTdCheckbox) {
             if (ele.checked) {
-                checked.push(ele.id.slice(3));
+                const p = ele.id.slice(3);
+                checked.push(p);
+                checkedParts.push(partsName[p]);
             }
         }
         console.log(checked);
@@ -32,7 +37,7 @@ const mixTable = new Table(tbl, {
 
 downloadBtn.addEventListener('click', () => {
     downloadBtn.disabled = true;
-    ipcRenderer.send('download-selected', videoTitle.innerHTML, checked);
+    ipcRenderer.send('download-selected', videoTitle.innerHTML, checked, checkedParts);
 });
 
 // update current path
@@ -65,7 +70,7 @@ ipcRenderer.on('render-save-path', (event, filePath) => {
 
 ipcRenderer.on('set-titles', (event, parts, title) => {
     let index = 0;
-    parts.forEach(ele => {
+    parts.forEach((ele, i) => {
         index++;
         const nextRow = tbl.insertRow();
         const cellChk = nextRow.insertCell(0);
@@ -76,12 +81,13 @@ ipcRenderer.on('set-titles', (event, parts, title) => {
         cellChk.innerHTML = `<td><input type="checkbox" id="${id}"><label class="ui-checkbox" for="${id}"></label></td>`
         cellTitle.innerHTML = ele;
         cellProgress.innerHTML = `<progress class="ui-progress" id="${progressId}"></progress>`;
+        partsName[i+1] = ele;
     });
     videoTitle.innerHTML = title;
 });
 
 ipcRenderer.on('downloading', (event, index, downloadSize, totalSize) => {
-    const el = document.querySelector(`#progress${index+1}`);
+    const el = document.querySelector(`#progress${index}`);
     el.value = Number(downloadSize/totalSize).toFixed(2);
 });
 
@@ -91,13 +97,13 @@ ipcRenderer.on('error-download', (event, msg) => {
 })
 
 ipcRenderer.on('finish-download', (event, filepath) => {
-    allFiles.push(filepath);
-    if (allFiles.length === 2) {
-        inputUrl.readOnly = false;
-        inputUrl.value = '';
-        // TODO 临时处理
-        ipcRenderer.send('merge-movie', allFiles, 'TODO', 'mp4');
-    }
+    // allFiles.push(filepath);
+    // if (allFiles.length === 2) {
+    //     inputUrl.readOnly = false;
+    //     inputUrl.value = '';
+    //     // TODO 临时处理
+    //     ipcRenderer.send('merge-movie', allFiles, 'TODO', 'mp4');
+    // }
 });
 
 // 登录成功, 构建 cookie, header

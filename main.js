@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, session, dialog } = require('electron');
 const { download, getVideoInfo, merge } = require('./downloader');
-const { getContent, buildHeaders } = require('./utils/net');
+const { getContent, buildHeaders, saveContent } = require('./utils/net');
 const fs = require('fs');
 
 let mainWindow;
@@ -11,8 +11,13 @@ let needDownload = [];
 // 已经下载好的视频
 let downloaded = []
 let baseUrl = '';
-let watcher;
-let isDownloading = false;
+let title = '成龙历险记';
+// 正在下载
+// { p: {filePath: [], partial: [], size: 0} };
+const downloading = {};
+// 分集名字
+const partsName = {};
+
 // 启动app
 app.on('ready', () => {
     // createWindow
@@ -51,29 +56,78 @@ ipcMain.on('get-video-info', async (event, url) => {
 })
 
 // 下载所选
-ipcMain.on('download-selected', async (event, title, pList) => {
-    pList.forEach(item => {
-        if (!downloaded.includes(item)) {
+ipcMain.on('download-selected', async (event, title, pList, parts) => {
+    pList.forEach((item, i) => {
+        if (!downloaded.includes(item) && !downloading[item]) {
             needDownload.push(item);
+            partsName[item] = parts[i];
         }
     });
-    if (needDownload.length > 0 && !isDownloading) {
-        const next = needDownload.shift();
-        await download(baseUrl+'?p='+needDownload.shift(), title, next, mainWindow)
-    }
+    await downloadP();
 })
 
+async function downloadP() {
+    // 先一个一个下载
+    if (needDownload.length > 0 && Object.keys(downloading).length < 1) {
+        const next = needDownload.shift();
+        const downloadUrl = baseUrl+'?p='+next;
+        console.log('downloading', downloadUrl);
+        downloading[next] = {
+            // 临时保存的文件路径
+            filePath: [],
+            // 下载的临时数据
+            partial: [],
+            totalSize: 0,
+            p: next,
+            // 最后保存的路径
+            saveName: '',
+            count: 0,
+        };
+        // bestSource = { container: '扩展名', quality: '品质', src: [[下载地址列表]], size: 总大小 }
+        const bestSource = await download(baseUrl+'?p='+next, title, next, mainWindow);
+        downloading[next].totalSize = bestSource.size;
+        downloading[next].partial = Array.from({length: bestSource.src.length}, (() => 0));
+        console.debug(JSON.stringify(bestSource));
+        const ext = bestSource.container;
+        const headers = await buildHeaders(downloadUrl);
+        downloading[next].filePath = Array.from({length: bestSource.src.length},
+            ((v, i) => `${__dirname}/${title}[${i}]${partsName[next]}.${ext}`));
+        downloading[next].saveName = `${__dirname}/${title}${partsName[next]}.${ext}`;
+        for (let i = 0; i < bestSource.src.length; i++) {
+            // TODO support saving path
+            await saveContent(mainWindow, i, bestSource.src[i][0], headers, downloading[next], mergeMovie);
+        }
+    }
+}
+
+// 合并视频
+async function mergeMovie(p) {
+    const conf = downloading[p];
+    conf.count ++;
+    if (conf.count !== conf.filePath.length) {
+        // 只在最后一个 promise 内合并
+        return;
+    }
+    await merge(conf.filePath, conf.saveName);
+    downloaded.push(p);
+    delete downloading[p];
+    // // 删除临时文件
+    // conf.filePath.forEach(elem => {
+    //     fs.unlinkSync(elem);
+    // })
+    await downloadP();
+}
 
 ipcMain.on('merge-movie', (event, files, title, ext) =>{
-    merge(files, title, ext).then(res => {
-        if (needDownload.length > 0) {
-            const next = needDownload.shift();
-           download(baseUrl+'?p='+next, title, next, mainWindow).then(res => {
-           });
-        }
-    }).catch(err => {
-        console.error(err);
-    })
+    // merge(files, title, ext).then(res => {
+    //     if (needDownload.length > 0) {
+    //         const next = needDownload.shift();
+    //        download(baseUrl+'?p='+next, title, next, mainWindow).then(res => {
+    //        });
+    //     }
+    // }).catch(err => {
+    //     console.error(err);
+    // })
 })
 
 ipcMain.on('login', () => {
@@ -112,7 +166,6 @@ ipcMain.on('login', () => {
             loginWindow.close();
         });
     })
-    loginWindow.openDevTools();
 })
 
 ipcMain.on('update-path', async () => {
