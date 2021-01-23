@@ -16,6 +16,7 @@ let title = '';
 const downloading = {};
 // 分集名字
 const partsName = {};
+let failedParts = [];
 let saveDir = '';
 
 // 启动app
@@ -33,7 +34,7 @@ app.on('ready', () => {
     mainWindow.loadFile(`${__dirname}/view/index.html`);
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
-        mainWindow.openDevTools();
+        // mainWindow.openDevTools();
     })
 });
 
@@ -47,6 +48,7 @@ ipcMain.on('get-video-info', async (event, url, currentPath) => {
         return;
     }
     saveDir = currentPath;
+    failedParts = [];
     const res = await getVideoInfo(url);
     if (res) {
         const title = res.title;
@@ -75,42 +77,77 @@ ipcMain.on('download-selected', async (event, videoTitle, pList, parts) => {
 })
 
 async function downloadP() {
-    // 先一个一个下载
-    if (needDownload.length > 0 && Object.keys(downloading).length < 1) {
-        const next = needDownload.shift();
-        const downloadUrl = baseUrl+'?p='+next;
-        console.debug('downloading', downloadUrl);
-        downloading[next] = {
-            // 临时保存的文件路径
-            filePath: [],
-            // 下载的临时数据
-            partial: [],
-            totalSize: 0,
-            p: next,
-            // 最后保存的路径
-            saveName: '',
-            count: 0,
-        };
-        // bestSource = { container: '扩展名', quality: '品质', src: [[下载地址列表]], size: 总大小 }
-        const bestSource = await download(downloadUrl, title, parseInt(next), mainWindow);
-        downloading[next].totalSize = bestSource.size;
-        downloading[next].partial = Array.from({length: bestSource.src.length}, (() => 0));
-        console.debug(JSON.stringify(bestSource));
-        const ext = bestSource.container;
-        const headers = await buildHeaders(downloadUrl);
-        downloading[next].filePath = Array.from({length: bestSource.src.length},
-            ((v, i) => `${saveDir}/${title}[${i}]${partsName[next]}.${ext}`));
-        downloading[next].saveName = `${saveDir}/${title}${partsName[next]}.${ext}`;
-        for (let i = 0; i < bestSource.src.length; i++) {
-            // TODO support saving path
-            await saveContent(mainWindow, i, bestSource.src[i][0], headers, downloading[next], mergeMovie);
+    // 同时下载的个数为3
+    if (needDownload.length > 0) {
+        const remain = 3 - Object.keys(downloading).length;
+        if (remain < 1) {
+            return;
+        }
+        for(let i = 0; i < remain; i++) {
+            const next = needDownload.shift();
+            const downloadUrl = baseUrl+'?p='+next;
+            console.debug('downloading', downloadUrl);
+            downloading[next] = {
+                // 临时保存的文件路径
+                filePath: [],
+                // 下载的临时数据
+                partial: [],
+                totalSize: 0,
+                p: next,
+                // 最后保存的路径
+                saveName: '',
+                count: 0,
+            };
+            // bestSource = { container: '扩展名', quality: '品质', src: [[下载地址列表]], size: 总大小 }
+            const bestSource = await retryDownload(downloadUrl, title, parseInt(next), mainWindow);
+            if (!bestSource) {
+                // 跳过这个视频
+                i--;
+                continue;
+            }
+            downloading[next].totalSize = bestSource.size;
+            downloading[next].partial = Array.from({length: bestSource.src.length}, (() => 0));
+            // console.debug(JSON.stringify(bestSource));
+            const ext = bestSource.container;
+            const headers = await buildHeaders(downloadUrl);
+            downloading[next].filePath = Array.from({length: bestSource.src.length},
+                ((v, i) => `${saveDir}/${title}[${i}]${partsName[next]}.${ext}`));
+            downloading[next].saveName = `${saveDir}/${title}${partsName[next]}.${ext}`;
+            for (let i = 0; i < bestSource.src.length; i++) {
+                // TODO support saving path
+                await saveContent(mainWindow, i, bestSource.src[i][0], headers, downloading[next], mergeMovie);
+            }
+        }
+
+    }
+}
+
+// 重试
+async function retryDownload(downloadUrl, title, next, mainWindow) {
+    for (let i = 0; i < 5; i++) {
+        try {
+            console.debug('try', i, 'times')
+            const bestSource = await download(downloadUrl, title, next, mainWindow);
+            if (bestSource) {
+                return bestSource;
+            }
+        } catch (e) {
+            console.error(e.message);
         }
     }
+    // 失败了,先下载别的.等待下一次循环
+    delete downloading[next];
+    console.error('skip', next);
+    return null;
 }
 
 // 合并视频
 async function mergeMovie(p) {
     const conf = downloading[p];
+    if (undefined === conf) {
+        // 肯定是被跳过了
+        return;
+    }
     conf.count ++;
     if (conf.count !== conf.filePath.length) {
         // 只在最后一个 promise 内合并
@@ -196,3 +233,6 @@ function getUsername() {
         console.error(err);
     })
 }
+process.on('uncaughtException', function (err) {
+    console.error(err.stack);
+})

@@ -135,12 +135,12 @@ async function getVideoInfo(url) {
 }
 
 /**
- * get download url
+ *
  * @param url
  * @param title
  * @param p
  * @param currentWindow
- * @returns {Promise<{size: number}>}
+ * @returns {Promise<null|{size: number}>}
  */
 async function download(url, title, p, currentWindow) {
     // 下载的地址

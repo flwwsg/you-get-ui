@@ -51,7 +51,9 @@ if (localStorage.getItem('savePath')) {
 }
 searchIcon.addEventListener('click', () => {
     // start download
-    tbl.removeChild(tbl.getElementsByTagName('tbody')[0]);
+    if (tbl.getElementsByTagName('tbody').length > 0) {
+        tbl.removeChild(tbl.getElementsByTagName('tbody')[0]);
+    }
     ipcRenderer.send('get-video-info', inputUrl.value, currentPath.innerHTML);
 })
 

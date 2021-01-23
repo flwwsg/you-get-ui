@@ -2,14 +2,16 @@
 
 const fs = require('fs');
 const axios = require('axios');
-
+const httpClient = axios.create();
+// 超时3秒
+httpClient.defaults.timeout = 3000;
 /**
  * 获取get 请求
  * @param url
  * @param headers
  */
 const getContent = async function (url, headers) {
-    const content = await axios.get(url, {
+    const content = await httpClient.get(url, {
         headers
     });
     return content.data;
@@ -39,7 +41,7 @@ const buildHeaders = async function (referer, cookie, origin) {
 
 // 获取长度
 const getSize = async function(url, headers) {
-    const content = await axios.get(url, {
+    const content = await httpClient.get(url, {
         headers,
         // 只需要知道长度
         responseType: "stream",
