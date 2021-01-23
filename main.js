@@ -1,7 +1,8 @@
 // const log = require('why-is-node-running');
 const { app, BrowserWindow, ipcMain, session, dialog } = require('electron');
 const { download, getVideoInfo, merge } = require('./downloader');
-const { getContent, buildHeaders, saveContent } = require('./utils/net');
+const { getContent, buildHeaders, retrySaveContent } = require('./utils/net');
+const fs = require('fs');
 
 let mainWindow;
 // 貌似不需要 cookies 也能下载高清视频...,这就很尴尬了
@@ -29,8 +30,8 @@ app.on('ready', () => {
             nodeIntegration: true,
             // enableRemoteModule: true,
         },
-        width: 1500,
-        height: 2000,
+        width: 700,
+        height: 800,
     })
     mainWindow.loadFile(`${__dirname}/view/index.html`);
     mainWindow.once('ready-to-show', () => {
@@ -45,6 +46,16 @@ ipcMain.on('get-video-info', async (event, url, currentPath) => {
         await dialog.showMessageBox(mainWindow, {
             title: '下载中,请稍等',
             message: '下载中,请稍等',
+        });
+        return;
+    }
+    try {
+        fs.lstatSync(currentPath);
+    } catch (e) {
+        console.error(e.message);
+        await dialog.showMessageBox(mainWindow, {
+            title: '文件保存路径错误',
+            message: `${currentPath} 不存在`,
         });
         return;
     }
@@ -67,7 +78,7 @@ ipcMain.on('get-video-info', async (event, url, currentPath) => {
 
 // 下载所选
 ipcMain.on('download-selected', async (event, videoTitle, pList, parts) => {
-    title = videoTitle;
+    title = videoTitle.replace(/[\/\\]/g, '-');
     pList.forEach((item, i) => {
         if (!downloaded.includes(item) && !downloading[item]) {
             needDownload.push(item);
@@ -80,7 +91,7 @@ ipcMain.on('download-selected', async (event, videoTitle, pList, parts) => {
 async function downloadP() {
     // 同时下载的个数为1, 多个下载会死机... FIXME
     if (needDownload.length > 0) {
-        const remain = 1 - Object.keys(downloading).length;
+        const remain = 3 - Object.keys(downloading).length;
         if (remain < 1) {
             return;
         }
@@ -100,7 +111,7 @@ async function downloadP() {
                 count: 0,
             };
             // bestSource = { container: '扩展名', quality: '品质', src: [[下载地址列表]], size: 总大小 }
-            const bestSource = await retryDownload(downloadUrl, title, parseInt(next), mainWindow);
+            const bestSource = await retryDownload(next, download, downloadUrl, title, parseInt(next), mainWindow);
             if (!bestSource) {
                 // 跳过这个视频
                 i--;
@@ -115,7 +126,7 @@ async function downloadP() {
                 ((v, i) => `${saveDir}/${title}[${i}]${partsName[next]}.${ext}`));
             downloading[next].saveName = `${saveDir}/${title}${partsName[next]}.${ext}`;
             for (let i = 0; i < bestSource.src.length; i++) {
-                await saveContent(mainWindow, i, bestSource.src[i][0], headers, downloading[next], mergeMovie);
+                await retrySaveContent(mainWindow, i, bestSource.src[i][0], headers, downloading[next], mergeMovie);
             }
         }
 
@@ -123,21 +134,23 @@ async function downloadP() {
 }
 
 // 重试
-async function retryDownload(downloadUrl, title, next, mainWindow) {
+// downloadUrl, title, next, mainWindow
+async function retryDownload(next, cb, ...args) {
     for (let i = 0; i < 5; i++) {
         try {
             console.debug('try', i, 'times')
-            const bestSource = await download(downloadUrl, title, next, mainWindow);
+            const bestSource = await cb(...args);
             if (bestSource) {
                 return bestSource;
             }
         } catch (e) {
-            console.error(e.message);
+            console.error(e.stack);
         }
     }
     // 失败了,先下载别的.等待下一次循环
     delete downloading[next];
     console.error('skip', next);
+    needDownload.push(next);
     return null;
 }
 
@@ -209,10 +222,6 @@ ipcMain.on('update-path', async () => {
     mainWindow.webContents.send('render-save-path', files.filePaths[0]);
 })
 
-ipcMain.on('update-video-title', async (event, videoTitle) => {
-    title = videoTitle;
-})
-
 function getUsername() {
     session.defaultSession.cookies.get({domain: '.bilibili.com'}).then(res => {
         const list = [];
@@ -234,7 +243,7 @@ function getUsername() {
     })
 }
 process.on('uncaughtException', function (err) {
-    console.error(err.stack);
+    console.error('get uncaught exception', err.stack);
 })
 
 // 检测保存运行node的进程

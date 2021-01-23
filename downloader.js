@@ -57,7 +57,7 @@ const getInitialState = async function(cheerioDom) {
             for (const child of node.children) {
                 if (child.data) {
                     if (child.data.startsWith('window.__INITIAL_STATE__=')) {
-                        return JSON.parse(child.data.split(';')[0].slice(25));
+                        return JSON.parse(child.data.split(';(function()')[0].slice(25));
                     }
                 }
             }

@@ -8,12 +8,13 @@ const hello = document.querySelector('#hello');
 const updatePath = document.querySelector('#updatePathBtn');
 const currentPath = document.querySelector('#currentPath');
 const videoTitle = document.querySelector('#videoTitle');
-const updateVideoTitle = document.querySelector('#updateVideoTitle');
 const downloadBtn = document.querySelector('#downloadBtn');
 
 let checked = [];
 const partsName = {};
 let checkedParts = [];
+const chineseCh = ['，',' 。','！','？', '【','】','（',' ）'];
+const englishCh = [',', '.', '!', '?','[', ']', '(', ')'];
 const mixTable = new Table(tbl, {
     onCheck: function ( isAllChecked, isAllUnchecked, eleCheckbox, eleAllTdCheckbox) {
         // console.log( isAllChecked, isAllUnchecked, eleCheckbox, eleCheckbox.checked);
@@ -27,15 +28,10 @@ const mixTable = new Table(tbl, {
                 checkedParts.push(partsName[p]);
             }
         }
-        console.log(checked);
     },
     data: {
 
     },
-});
-
-updateVideoTitle.addEventListener('click', () => {
-    ipcRenderer.send('update-video-title', videoTitle.value);
 });
 
 downloadBtn.addEventListener('click', () => {
@@ -50,10 +46,6 @@ if (localStorage.getItem('savePath')) {
     currentPath.innerHTML = '视频默认保存在当前目录,点击按钮更新路径'
 }
 searchIcon.addEventListener('click', () => {
-    // start download
-    if (tbl.getElementsByTagName('tbody').length > 0) {
-        tbl.removeChild(tbl.getElementsByTagName('tbody')[0]);
-    }
     ipcRenderer.send('get-video-info', inputUrl.value, currentPath.innerHTML);
 })
 
@@ -74,6 +66,10 @@ ipcRenderer.on('render-save-path', (event, filePath) => {
 
 ipcRenderer.on('set-titles', (event, parts, title) => {
     let index = 0;
+    // start download
+    if (tbl.getElementsByTagName('tbody').length > 0) {
+        tbl.removeChild(tbl.getElementsByTagName('tbody')[0]);
+    }
     // 使用 Table 组件,空数据时,会删除 tbody 节点
     if (tbl.getElementsByTagName('tbody').length < 1) {
         tbl.appendChild(document.createElement('tbody'));
@@ -89,7 +85,7 @@ ipcRenderer.on('set-titles', (event, parts, title) => {
         cellChk.innerHTML = `<td><input type="checkbox" id="${id}"><label class="ui-checkbox" for="${id}"></label></td>`
         cellTitle.innerHTML = ele;
         cellProgress.innerHTML = `<progress class="ui-progress" id="${progressId}"></progress>`;
-        partsName[i+1] = ele;
+        partsName[i+1] = normalFileName(ele);
     });
     videoTitle.value = title;
 });
@@ -111,3 +107,11 @@ ipcRenderer.on('login-success', (event, uname) => {
     loginAction.parentNode.removeChild(loginAction);
     hello.innerHTML =  'hi, '+uname;
 });
+
+function normalFileName(s) {
+    for (let i = 0; i < chineseCh.length; i++) {
+        const reg = new RegExp(chineseCh[i], 'g');
+        s.replace(reg, englishCh[i]);
+    }
+    return s.replace(/\//g, '-');
+}
