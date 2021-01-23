@@ -302,8 +302,8 @@ async function download(url, title, p, currentWindow) {
         return bestDashStream;
     } else {
         // TODO download flv
+        return bestStream
     }
-    return null;
 }
 
 // 合并视频

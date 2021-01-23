@@ -52,27 +52,49 @@ const getSize = async function(url, headers) {
 
 
 const retrySaveContent = async function(currentWindow, index, url, urlHeaders, conf, cb) {
-    const { data } = await axios({
-        url,
-        method: 'GET',
-        responseType: 'stream',
-        headers: urlHeaders,
-    });
-    const filepath = conf.filePath[index];
-    data.on('data', chunk => {
-        conf.partial[index] += chunk.length;
-        let s = 0;
-        conf.partial.forEach( val => s += val);
-        currentWindow.webContents.send('downloading', conf.p, s, conf.totalSize);
-    });
-
-    const writer = fs.createWriteStream(filepath);
-    data.pipe(writer)
-    writer.on('finish', () => {
-        cb(conf.p).then(res => {
-            console.debug('write success', filepath);
+    try {
+        const { data } = await axios({
+            url,
+            method: 'GET',
+            responseType: 'stream',
+            headers: urlHeaders,
         });
-    })
+        const filepath = conf.filePath[index];
+        data.on('data', chunk => {
+            conf.partial[index] += chunk.length;
+            let s = 0;
+            conf.partial.forEach( val => s += val);
+            currentWindow.webContents.send('downloading', conf.p, s, conf.totalSize);
+        });
+
+        const writer = fs.createWriteStream(filepath);
+        data.pipe(writer)
+        writer.on('finish', () => {
+            cb(conf.p).then(res => {
+                console.debug('write success', filepath);
+            });
+        });
+    } catch (error) {
+        if (error.response) {
+            /*
+             * The request was made and the server responded with a
+             * status code that falls out of the range of 2xx
+             */
+            console.log(error.response.data);
+            console.log(error.response.status);
+            console.log(error.response.headers);
+        } else if (error.request) {
+            /*
+             * The request was made but no response was received, `error.request`
+             * is an instance of XMLHttpRequest in the browser and an instance
+             * of http.ClientRequest in Node.js
+             */
+            console.log(error.request);
+        } else {
+            // Something happened in setting up the request and triggered an Error
+            console.log('Error', error.stack);
+        }
+    }
 }
 
 module.exports = {

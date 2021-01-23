@@ -97,6 +97,10 @@ async function downloadP() {
         }
         for(let r = 0; r < remain; r++) {
             const next = needDownload.shift();
+            if (undefined === next) {
+                // 没有东西了
+                break;
+            }
             const downloadUrl = baseUrl+'?p='+next;
             console.debug('downloading', downloadUrl);
             downloading[next] = {
@@ -126,7 +130,11 @@ async function downloadP() {
                 ((v, i) => `${saveDir}/${title}[${i}]${partsName[next]}.${ext}`));
             downloading[next].saveName = `${saveDir}/${title}${partsName[next]}.${ext}`;
             for (let i = 0; i < bestSource.src.length; i++) {
-                await retrySaveContent(mainWindow, i, bestSource.src[i][0], headers, downloading[next], mergeMovie);
+                if (ext === 'flv') {
+                    await retrySaveContent(mainWindow, i, bestSource.src[i], headers, downloading[next], mergeMovie);
+                } else if (ext === 'mp4') {
+                    await retrySaveContent(mainWindow, i, bestSource.src[i][0], headers, downloading[next], mergeMovie);
+                }
             }
         }
 
@@ -143,14 +151,33 @@ async function retryDownload(next, cb, ...args) {
             if (bestSource) {
                 return bestSource;
             }
-        } catch (e) {
-            console.error(e.stack);
+        } catch (error) {
+            if (error.response) {
+                /*
+                 * The request was made and the server responded with a
+                 * status code that falls out of the range of 2xx
+                 */
+                console.log(error.response.data);
+                console.log(error.response.status);
+                console.log(error.response.headers);
+            } else if (error.request) {
+                /*
+                 * The request was made but no response was received, `error.request`
+                 * is an instance of XMLHttpRequest in the browser and an instance
+                 * of http.ClientRequest in Node.js
+                 */
+                console.log(error.request);
+            } else {
+                // Something happened in setting up the request and triggered an Error
+                console.log('Error', error.message);
+            }
+            console.log(error);
         }
     }
     // 失败了,先下载别的.等待下一次循环
     delete downloading[next];
     console.error('skip', next);
-    needDownload.push(next);
+    // needDownload.push(next);
     return null;
 }
 
