@@ -1,7 +1,6 @@
 const { app, BrowserWindow, ipcMain, session, dialog } = require('electron');
 const { download, getVideoInfo, merge } = require('./downloader');
 const { getContent, buildHeaders, saveContent } = require('./utils/net');
-const fs = require('fs');
 
 let mainWindow;
 // 貌似不需要 cookies 也能下载高清视频...,这就很尴尬了
@@ -11,12 +10,13 @@ let needDownload = [];
 // 已经下载好的视频
 let downloaded = []
 let baseUrl = '';
-let title = '成龙历险记';
+let title = '';
 // 正在下载
 // { p: {filePath: [], partial: [], size: 0} };
 const downloading = {};
 // 分集名字
 const partsName = {};
+let saveDir = '';
 
 // 启动app
 app.on('ready', () => {
@@ -38,8 +38,15 @@ app.on('ready', () => {
 });
 
 // 从页面接收url
-ipcMain.on('get-video-info', async (event, url) => {
-    console.log(url);
+ipcMain.on('get-video-info', async (event, url, currentPath) => {
+    if (needDownload.length > 0 || Object.keys(downloading).length > 0) {
+        await dialog.showMessageBox(mainWindow, {
+            title: '下载中,请稍等',
+            message: '下载中,请稍等',
+        });
+        return;
+    }
+    saveDir = currentPath;
     const res = await getVideoInfo(url);
     if (res) {
         const title = res.title;
@@ -56,7 +63,8 @@ ipcMain.on('get-video-info', async (event, url) => {
 })
 
 // 下载所选
-ipcMain.on('download-selected', async (event, title, pList, parts) => {
+ipcMain.on('download-selected', async (event, videoTitle, pList, parts) => {
+    title = videoTitle;
     pList.forEach((item, i) => {
         if (!downloaded.includes(item) && !downloading[item]) {
             needDownload.push(item);
@@ -71,7 +79,7 @@ async function downloadP() {
     if (needDownload.length > 0 && Object.keys(downloading).length < 1) {
         const next = needDownload.shift();
         const downloadUrl = baseUrl+'?p='+next;
-        console.log('downloading', downloadUrl);
+        console.debug('downloading', downloadUrl);
         downloading[next] = {
             // 临时保存的文件路径
             filePath: [],
@@ -84,15 +92,15 @@ async function downloadP() {
             count: 0,
         };
         // bestSource = { container: '扩展名', quality: '品质', src: [[下载地址列表]], size: 总大小 }
-        const bestSource = await download(baseUrl+'?p='+next, title, next, mainWindow);
+        const bestSource = await download(downloadUrl, title, parseInt(next), mainWindow);
         downloading[next].totalSize = bestSource.size;
         downloading[next].partial = Array.from({length: bestSource.src.length}, (() => 0));
         console.debug(JSON.stringify(bestSource));
         const ext = bestSource.container;
         const headers = await buildHeaders(downloadUrl);
         downloading[next].filePath = Array.from({length: bestSource.src.length},
-            ((v, i) => `${__dirname}/${title}[${i}]${partsName[next]}.${ext}`));
-        downloading[next].saveName = `${__dirname}/${title}${partsName[next]}.${ext}`;
+            ((v, i) => `${saveDir}/${title}[${i}]${partsName[next]}.${ext}`));
+        downloading[next].saveName = `${saveDir}/${title}${partsName[next]}.${ext}`;
         for (let i = 0; i < bestSource.src.length; i++) {
             // TODO support saving path
             await saveContent(mainWindow, i, bestSource.src[i][0], headers, downloading[next], mergeMovie);
@@ -111,24 +119,8 @@ async function mergeMovie(p) {
     await merge(conf.filePath, conf.saveName);
     downloaded.push(p);
     delete downloading[p];
-    // // 删除临时文件
-    // conf.filePath.forEach(elem => {
-    //     fs.unlinkSync(elem);
-    // })
     await downloadP();
 }
-
-ipcMain.on('merge-movie', (event, files, title, ext) =>{
-    // merge(files, title, ext).then(res => {
-    //     if (needDownload.length > 0) {
-    //         const next = needDownload.shift();
-    //        download(baseUrl+'?p='+next, title, next, mainWindow).then(res => {
-    //        });
-    //     }
-    // }).catch(err => {
-    //     console.error(err);
-    // })
-})
 
 ipcMain.on('login', () => {
     const url = 'https://passport.bilibili.com/login';
@@ -176,7 +168,12 @@ ipcMain.on('update-path', async () => {
         return;
     }
     // 通知页面保存文件路径
+    saveDir = files.filePaths[0];
     mainWindow.webContents.send('render-save-path', files.filePaths[0]);
+})
+
+ipcMain.on('update-video-title', async (event, videoTitle) => {
+    title = videoTitle;
 })
 
 function getUsername() {

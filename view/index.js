@@ -11,10 +11,6 @@ const videoTitle = document.querySelector('#videoTitle');
 const updateVideoTitle = document.querySelector('#updateVideoTitle');
 const downloadBtn = document.querySelector('#downloadBtn');
 
-let count = 1;
-let allFiles = [];
-let title = '';
-let ext = '';
 let checked = [];
 const partsName = {};
 let checkedParts = [];
@@ -32,12 +28,19 @@ const mixTable = new Table(tbl, {
             }
         }
         console.log(checked);
-    }
+    },
+    data: {
+
+    },
+});
+
+updateVideoTitle.addEventListener('click', () => {
+    ipcRenderer.send('update-video-title', videoTitle.value);
 });
 
 downloadBtn.addEventListener('click', () => {
     downloadBtn.disabled = true;
-    ipcRenderer.send('download-selected', videoTitle.innerHTML, checked, checkedParts);
+    ipcRenderer.send('download-selected', videoTitle.value, checked, checkedParts);
 });
 
 // update current path
@@ -47,10 +50,9 @@ if (localStorage.getItem('savePath')) {
     currentPath.innerHTML = '视频默认保存在当前目录,点击按钮更新路径'
 }
 searchIcon.addEventListener('click', () => {
-    console.log('input url by search icon', inputUrl.value);
-    inputUrl.readOnly = true;
     // start download
-    ipcRenderer.send('get-video-info', inputUrl.value);
+    tbl.removeChild(tbl.getElementsByTagName('tbody')[0]);
+    ipcRenderer.send('get-video-info', inputUrl.value, currentPath.innerHTML);
 })
 
 loginAction.addEventListener('click', (event) => {
@@ -70,9 +72,13 @@ ipcRenderer.on('render-save-path', (event, filePath) => {
 
 ipcRenderer.on('set-titles', (event, parts, title) => {
     let index = 0;
+    // 使用 Table 组件,空数据时,会删除 tbody 节点
+    if (tbl.getElementsByTagName('tbody').length < 1) {
+        tbl.appendChild(document.createElement('tbody'));
+    }
     parts.forEach((ele, i) => {
         index++;
-        const nextRow = tbl.insertRow();
+        const nextRow = tbl.getElementsByTagName('tbody')[0].insertRow();
         const cellChk = nextRow.insertCell(0);
         const cellTitle = nextRow.insertCell(1);
         const cellProgress = nextRow.insertCell(2);
@@ -83,7 +89,7 @@ ipcRenderer.on('set-titles', (event, parts, title) => {
         cellProgress.innerHTML = `<progress class="ui-progress" id="${progressId}"></progress>`;
         partsName[i+1] = ele;
     });
-    videoTitle.innerHTML = title;
+    videoTitle.value = title;
 });
 
 ipcRenderer.on('downloading', (event, index, downloadSize, totalSize) => {
@@ -96,20 +102,10 @@ ipcRenderer.on('error-download', (event, msg) => {
     inputUrl.value = '';
 })
 
-ipcRenderer.on('finish-download', (event, filepath) => {
-    // allFiles.push(filepath);
-    // if (allFiles.length === 2) {
-    //     inputUrl.readOnly = false;
-    //     inputUrl.value = '';
-    //     // TODO 临时处理
-    //     ipcRenderer.send('merge-movie', allFiles, 'TODO', 'mp4');
-    // }
-});
 
 // 登录成功, 构建 cookie, header
 ipcRenderer.on('login-success', (event, uname) => {
     // 移除登录按钮
     loginAction.parentNode.removeChild(loginAction);
     hello.innerHTML =  'hi, '+uname;
-
 });

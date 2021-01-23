@@ -50,11 +50,6 @@ for (const st of streamTypes) {
     streamQualities[st.quality] = st;
 }
 
-// 下载的地址
-const streams = {};
-const dashStreams = {};
-let bestStream;
-let bestDashStream = { size: 0};
 
 const getInitialState = async function(cheerioDom) {
     for (const node of cheerioDom('script')) {
@@ -148,45 +143,30 @@ async function getVideoInfo(url) {
  * @returns {Promise<{size: number}>}
  */
 async function download(url, title, p, currentWindow) {
+    // 下载的地址
+    const streams = {};
+    const dashStreams = {};
+    let bestStream;
+    let bestDashStream = { size: 0};
     // get initial_state and playInfo
     let headers = await buildHeaders();
     let htmlContent = await getContent(url, headers);
-    // console.log(httpContent);
     let dom = htmlparser2.parseDocument(htmlContent);
     let root = cheerio.load(dom);
     const initialState = await getInitialState(root);
     const playInfo = await getPlayInfo(root);
 
-    if (!initialState || !playInfo) {
+    if (!initialState) {
         console.error('get initialState or playInfo error');
         process.exit(1);
     }
     // console.log(initialState);
     // console.log(playInfo);
 
-    // get playInfo_
-    headers = await buildHeaders(null, 'CURRENT_FNVAL=16');
-    htmlContent = await getContent(url, headers);
-    dom = htmlparser2.parseDocument(htmlContent);
-    root = cheerio.load(dom);
-    const playInfo2 = await getPlayInfo(root);
-    if (playInfo2 === null) {
-        console.error('get playInfo 2 fail');
+    if (playInfo === null) {
+        console.error('get playInfo fail');
         process.exit(1);
     }
-    // 总集数
-    const pn = initialState.videoData.videos;
-
-    // // 查找集数
-    // console.log(JSON.stringify(initialState));
-    // console.log(JSON.stringify(playInfo));
-    // console.log(JSON.stringify(playInfo2));
-
-    // // TODO check play list
-    // if (pn > 1) {
-    //     title = `${title}${initialState.videoData.pages[p-1].part}`;
-    // }
-
     // construct playInfo
     const avid = initialState.aid;
     const cid = initialState.videoData.pages[p-1].cid;
@@ -202,10 +182,6 @@ async function download(url, title, p, currentWindow) {
     if (playInfo) {
         playInfos.push(playInfo);
     }
-    if (playInfo2) {
-        playInfos.push(playInfo2);
-    }
-
     // get format from api
     for (const qn of [120, 112, 80, 64, 32, 16]) {
         if(!currentQuality || qn < currentQuality) {
@@ -305,8 +281,7 @@ async function download(url, title, p, currentWindow) {
     }
 
     // 选择最好品质的下载(已经合并音轨 flv)
-    for (const k of Object.keys(streamTypes)) {
-        const st = streamTypes[k];
+    for (const st of streamTypes) {
         if (streams[st.id]) {
             bestStream = { ...streams[st.id], id: st.id};
             break;
@@ -323,19 +298,8 @@ async function download(url, title, p, currentWindow) {
     // console.debug(streams);
     // console.debug(dashStreams);
     // console.debug(bestStream, bestDashStream);
-    // headers = await buildHeaders(url);
-    // const allFiles = [];
-    // let ext;
     if (bestDashStream.size > 0) {
         return bestDashStream;
-        // // 就是你了
-        // for (let i=0; i<bestDashStream.src.length; i++) {
-        //     ext = bestDashStream.container;
-        //     const downloadUrl = bestDashStream.src[i][0];
-        //     const tmpFile = path.join(__dirname, title+`[${i}].`+ext);
-        //     allFiles.push(tmpFile);
-        //     await saveContent(currentWindow, i, downloadUrl, tmpFile, headers);
-        // }
     } else {
         // TODO download flv
     }
@@ -348,7 +312,7 @@ async function merge(allFiles, saveName) {
         // 需要版本 > 2
         const list = allFiles.join(' -i ');
         console.debug('saving file at', saveName, allFiles, list);
-        const args = [];
+        const args = [ '-y' ];
         for (const f of allFiles) {
             args.push('-i');
             args.push(f);
