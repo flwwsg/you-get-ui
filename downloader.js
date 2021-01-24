@@ -113,7 +113,10 @@ async function getVideoInfo(url) {
         return;
     }
     // 支持
-    const baseUrl = url.split('?')[0];
+    let baseUrl = url.split('?')[0];
+    if (baseUrl[baseUrl.length - 1] === '/') {
+        baseUrl = baseUrl.slice(0, baseUrl.length - 1)
+    }
     // get initial_state and playInfo
     let headers = await buildHeaders();
     let htmlContent = await getContent(url, headers);
