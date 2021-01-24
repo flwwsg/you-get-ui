@@ -136,12 +136,11 @@ async function downloadP() {
             downloading[next].saveName = `${saveDir}/${title}${partsName[next]}.${ext}`;
             try {
                 for (let i = 0; i < bestSource.src.length; i++) {
-                    // if (ext === 'flv') {
-                    //     await retrySaveContent(mainWindow, i, bestSource.src[i], headers, downloading[next], mergeMovie);
-                    // } else if (ext === 'mp4') {
-                    //     await retrySaveContent(mainWindow, i, bestSource.src[i][0], headers, downloading[next], mergeMovie);
-                    // }
-                    await mergeMovie(next);
+                    if (ext === 'flv') {
+                        await retrySaveContent(mainWindow, i, bestSource.src[i], headers, downloading[next], mergeMovie);
+                    } else if (ext === 'mp4') {
+                        await retrySaveContent(mainWindow, i, bestSource.src[i][0], headers, downloading[next], mergeMovie);
+                    }
                 }
             } catch (e) {
                 // 失败了,
