@@ -103,7 +103,7 @@ async function downloadP() {
             }
             if (failedParts.includes(next)) {
                 // 删除之前失败的视频
-                const index = failedParts.findIndex(next);
+                const index = failedParts.indexOf(next);
                 failedParts = [].concat(failedParts.slice(0, index), failedParts.slice(index + 1, failedParts.length));
             }
             const downloadUrl = baseUrl+'?p='+next;
@@ -276,7 +276,7 @@ process.on('uncaughtException', function (err) {
     console.error('get uncaught exception', err.stack);
 })
 
-// 检测保存运行node的进程
-// setTimeout(function () {
+// // 检测保存运行node的进程
+// setInterval(function () {
 //     log() // logs out active handles that are keeping node running
 // }, 10000)
