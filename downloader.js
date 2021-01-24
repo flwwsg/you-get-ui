@@ -1,10 +1,11 @@
 'use strict';
-const { getContent, buildHeaders, getSize, saveContent } = require('./utils/net');
+const { getContent, buildHeaders, getSize } = require('./utils/net');
 const cheerio = require('cheerio');
 const htmlparser2 = require('htmlparser2');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const fs = require('fs');
+const path = require('path');
 
 // 流媒体类型
 const streamTypes = [
@@ -301,22 +302,32 @@ async function download(url, title, p, currentWindow) {
     if (bestDashStream.size > 0) {
         return bestDashStream;
     } else {
-        // TODO download flv
         return bestStream
     }
 }
 
 // 合并视频
 async function merge(allFiles, saveName) {
+    // 当前版本 ffmpeg version n4.3.1
     if (allFiles.length > 1) {
         // 需要版本 > 2
-        // console.debug('saving file at', saveName, allFiles);
-        const args = [ '-y' ];
-        for (const f of allFiles) {
-            args.push('-i');
-            args.push(f);
+        let result;
+        let out = null;
+        if (path.extname(saveName) === '.flv') {
+            // 合并 flv
+            out = saveName + '.txt';
+            concatList(allFiles, out);
+            result = spawn('ffmpeg', ['-y', '-f', 'concat', '-safe', '-1', '-i', out, '-c', 'copy', '-bsf:a', 'aac_adtstoasc','--', saveName]);
+        } else if(path.extname(saveName) === '.mp4') {
+            // 合并 mp4 文件
+            const args = [ '-y' ];
+            for (const f of allFiles) {
+                args.push('-i');
+                args.push(f);
+            }
+            result = spawn('ffmpeg', [...args, '-c', 'copy', '-bsf:a', 'aac_adtstoasc','--', saveName]);
         }
-        const result = spawn('ffmpeg', [...args, '-c', 'copy', '-bsf:a', 'aac_adtstoasc','--', saveName]);
+
         result.stderr.on('data', data => {
             console.debug(data.toString());
         })
@@ -328,9 +339,18 @@ async function merge(allFiles, saveName) {
             // 删除临时文件
             allFiles.forEach(elem => {
                 fs.unlinkSync(elem);
-            })
+            });
+            if (out) {
+                fs.unlinkSync(out);
+            }
         })
     }
+}
+
+// 生成合并视频的列表文件
+function concatList (files, out) {
+    const output = files.map(val => { return 'file \'' + val + '\'' }).join('\n');
+    fs.writeFileSync(out, output);
 }
 
 

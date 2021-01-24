@@ -101,6 +101,11 @@ async function downloadP() {
                 // 没有东西了
                 break;
             }
+            if (failedParts.includes(next)) {
+                // 删除之前失败的视频
+                const index = failedParts.findIndex(next);
+                failedParts = [].concat(failedParts.slice(0, index), failedParts.slice(index + 1, failedParts.length));
+            }
             const downloadUrl = baseUrl+'?p='+next;
             console.debug('downloading', downloadUrl);
             downloading[next] = {
@@ -129,12 +134,20 @@ async function downloadP() {
             downloading[next].filePath = Array.from({length: bestSource.src.length},
                 ((v, i) => `${saveDir}/${title}[${i}]${partsName[next]}.${ext}`));
             downloading[next].saveName = `${saveDir}/${title}${partsName[next]}.${ext}`;
-            for (let i = 0; i < bestSource.src.length; i++) {
-                if (ext === 'flv') {
-                    await retrySaveContent(mainWindow, i, bestSource.src[i], headers, downloading[next], mergeMovie);
-                } else if (ext === 'mp4') {
-                    await retrySaveContent(mainWindow, i, bestSource.src[i][0], headers, downloading[next], mergeMovie);
+            try {
+                for (let i = 0; i < bestSource.src.length; i++) {
+                    // if (ext === 'flv') {
+                    //     await retrySaveContent(mainWindow, i, bestSource.src[i], headers, downloading[next], mergeMovie);
+                    // } else if (ext === 'mp4') {
+                    //     await retrySaveContent(mainWindow, i, bestSource.src[i][0], headers, downloading[next], mergeMovie);
+                    // }
+                    await mergeMovie(next);
                 }
+            } catch (e) {
+                // 失败了,
+                failedParts.push(next);
+                delete downloading[next];
+                console.error('skip', next);
             }
         }
 
@@ -153,28 +166,19 @@ async function retryDownload(next, cb, ...args) {
             }
         } catch (error) {
             if (error.response) {
-                /*
-                 * The request was made and the server responded with a
-                 * status code that falls out of the range of 2xx
-                 */
                 console.log(error.response.data);
                 console.log(error.response.status);
                 console.log(error.response.headers);
             } else if (error.request) {
-                /*
-                 * The request was made but no response was received, `error.request`
-                 * is an instance of XMLHttpRequest in the browser and an instance
-                 * of http.ClientRequest in Node.js
-                 */
                 console.log(error.request);
             } else {
-                // Something happened in setting up the request and triggered an Error
                 console.log('Error', error.message);
             }
             console.log(error);
         }
     }
     // 失败了,先下载别的.等待下一次循环
+    failedParts.push(next);
     delete downloading[next];
     console.error('skip', next);
     // needDownload.push(next);
@@ -184,7 +188,7 @@ async function retryDownload(next, cb, ...args) {
 // 合并视频
 async function mergeMovie(p) {
     const conf = downloading[p];
-    if (undefined === conf) {
+    if (undefined === conf || failedParts.includes(p)) {
         // 肯定是被跳过了
         return;
     }

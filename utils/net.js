@@ -51,13 +51,21 @@ const getSize = async function(url, headers) {
 }
 
 
-const retrySaveContent = async function(currentWindow, index, url, urlHeaders, conf, cb) {
+const retrySaveContent = async function(currentWindow, index, url, urlHeaders, conf, cb, tryCount=5) {
+    if (tryCount < 1) {
+        // 下载不成功,只能 TODO throw 通知失败
+        console.error('downloading fail', conf.p);
+        return
+    }
     try {
+        console.debug('try saving vide', tryCount - 4 , 'times' );
         const { data } = await axios({
             url,
             method: 'GET',
             responseType: 'stream',
             headers: urlHeaders,
+            // 5s
+            timeout: 1000 * 5,
         });
         const filepath = conf.filePath[index];
         data.on('data', chunk => {
@@ -76,24 +84,15 @@ const retrySaveContent = async function(currentWindow, index, url, urlHeaders, c
         });
     } catch (error) {
         if (error.response) {
-            /*
-             * The request was made and the server responded with a
-             * status code that falls out of the range of 2xx
-             */
             console.log(error.response.data);
             console.log(error.response.status);
             console.log(error.response.headers);
         } else if (error.request) {
-            /*
-             * The request was made but no response was received, `error.request`
-             * is an instance of XMLHttpRequest in the browser and an instance
-             * of http.ClientRequest in Node.js
-             */
             console.log(error.request);
         } else {
-            // Something happened in setting up the request and triggered an Error
             console.log('Error', error.stack);
         }
+        return retrySaveContent(currentWindow, index, url, urlHeaders, conf, cb, tryCount-1);
     }
 }
 
