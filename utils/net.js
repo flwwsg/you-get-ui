@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const axios = require('axios');
-const { channelName } = require('./constants');
+const { channelName, userAgent } = require('./constants');
 
 const httpClient = axios.create();
 // 超时3秒
@@ -27,8 +27,7 @@ const getContent = async function (url, headers) {
  * @param origin
  */
 const buildHeaders = async function (referer, cookie, origin) {
-    const ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Safari/537.36';
-    const headers = {Accept: '*/*', 'Accept-Language': 'en-US,en;q=0.5', 'User-Agent': ua};
+    const headers = {Accept: '*/*', 'Accept-Language': 'en-US,en;q=0.5', 'User-Agent': userAgent};
     if (undefined !== referer && referer !== null) {
         headers.Referer = referer;
     }
@@ -52,55 +51,36 @@ const getSize = async function(url, headers) {
     return parseInt(size);
 }
 
+// 下载视频, TODO 支持断点续传
+const saveContents = async function(currentWindow, index, url, urlHeaders, conf, cb) {
+    const { data } = await axios({
+        url,
+        method: 'GET',
+        responseType: 'stream',
+        headers: urlHeaders,
+        // 5s
+        timeout: 1000 * 5,
+    });
+    const filepath = conf.filePath[index];
+    data.on('data', chunk => {
+        conf.partial[index] += chunk.length;
+        let s = 0;
+        conf.partial.forEach( val => s += val);
+        currentWindow.webContents.send(channelName.downloading, conf.p, s, conf.totalSize);
+    });
 
-const retrySaveContent = async function(currentWindow, index, url, urlHeaders, conf, cb, tryCount=5) {
-    if (tryCount < 1) {
-        // 下载不成功,只能 TODO throw 通知失败
-        console.error('downloading fail', conf.p);
-        return
-    }
-    try {
-        console.debug('try saving vide', tryCount - 4 , 'times' );
-        const { data } = await axios({
-            url,
-            method: 'GET',
-            responseType: 'stream',
-            headers: urlHeaders,
-            // 5s
-            timeout: 1000 * 5,
+    const writer = fs.createWriteStream(filepath);
+    data.pipe(writer)
+    writer.on('finish', () => {
+        cb(conf.p).then(res => {
+            console.debug('write success', filepath);
         });
-        const filepath = conf.filePath[index];
-        data.on('data', chunk => {
-            conf.partial[index] += chunk.length;
-            let s = 0;
-            conf.partial.forEach( val => s += val);
-            currentWindow.webContents.send(channelName.downloading, conf.p, s, conf.totalSize);
-        });
-
-        const writer = fs.createWriteStream(filepath);
-        data.pipe(writer)
-        writer.on('finish', () => {
-            cb(conf.p).then(res => {
-                console.debug('write success', filepath);
-            });
-        });
-    } catch (error) {
-        if (error.response) {
-            console.log(error.response.data);
-            console.log(error.response.status);
-            console.log(error.response.headers);
-        } else if (error.request) {
-            console.log(error.request);
-        } else {
-            console.log('Error', error.stack);
-        }
-        return retrySaveContent(currentWindow, index, url, urlHeaders, conf, cb, tryCount-1);
-    }
+    });
 }
 
 module.exports = {
     getContent,
     buildHeaders,
     getSize,
-    retrySaveContent,
+    saveContents,
 }

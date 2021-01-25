@@ -1,12 +1,8 @@
 'use strict';
-const { getContent, buildHeaders, getSize } = require('./utils/net');
-const { channelName } = require('./utils/constants');
+const { getContent, buildHeaders, getSize } = require('../utils/net');
 const cheerio = require('cheerio');
 const htmlparser2 = require('htmlparser2');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
-const fs = require('fs');
-const path = require('path');
 
 // 流媒体类型
 const streamTypes = [
@@ -140,14 +136,14 @@ async function getVideoInfo(url) {
 }
 
 /**
- *
+ * 查询下载地址
  * @param url
  * @param title
  * @param p
  * @param currentWindow
  * @returns {Promise<null|{size: number}>}
  */
-async function download(url, title, p, currentWindow) {
+async function queryDownloadUrl(url, title, p, currentWindow) {
     // 下载的地址
     const streams = {};
     const dashStreams = {};
@@ -304,62 +300,40 @@ async function download(url, title, p, currentWindow) {
     // console.debug(dashStreams);
     // console.debug(bestStream, bestDashStream);
     if (bestDashStream.size > 0) {
+        // 归一化,src 字段
+        bestDashStream.src = bestDashStream.src.map(value => {
+            return value[0];
+        });
         return bestDashStream;
     } else {
+        // 光能使者第 8 集是flv
         return bestStream
     }
 }
 
-// 合并视频
-async function merge(allFiles, saveName) {
-    // 当前版本 ffmpeg version n4.3.1
-    if (allFiles.length > 1) {
-        // 需要版本 > 2
-        let result;
-        let out = null;
-        if (path.extname(saveName) === '.flv') {
-            // 合并 flv
-            out = saveName + '.txt';
-            concatList(allFiles, out);
-            result = spawn('ffmpeg', ['-y', '-f', 'concat', '-safe', '-1', '-i', out, '-c', 'copy', '-bsf:a', 'aac_adtstoasc','--', saveName]);
-        } else if(path.extname(saveName) === '.mp4') {
-            // 合并 mp4 文件
-            const args = [ '-y' ];
-            for (const f of allFiles) {
-                args.push('-i');
-                args.push(f);
-            }
-            result = spawn('ffmpeg', [...args, '-c', 'copy', '-bsf:a', 'aac_adtstoasc','--', saveName]);
+/**
+ * 获取用户名
+ * @param session
+ * @returns {Promise<*>}
+ */
+async function getUsername(session) {
+    const res = await session.defaultSession.cookies.get({domain: '.bilibili.com'});
+    const list = [];
+    res.filter(value => {
+        if (value.path === '/') {
+            list.push(`${value.name}=${value.value}`);
         }
+    })
+    const cookies = list.join('; ');
+    console.log(cookies);
+    const headers = await buildHeaders('https://www.bilibili.com', cookies);
+    const contents = await getContent('https://api.bilibili.com/x/web-interface/nav', headers);
+    return contents.data.uname;
 
-        result.stderr.on('data', data => {
-            console.debug(data.toString());
-        })
-        result.stdout.on('data', data => {
-            console.debug(data.toString());
-        })
-        // 退出时删除临时文件
-        result.on('close', code => {
-            // 删除临时文件
-            allFiles.forEach(elem => {
-                fs.unlinkSync(elem);
-            });
-            if (out) {
-                fs.unlinkSync(out);
-            }
-        })
-    }
 }
-
-// 生成合并视频的列表文件
-function concatList (files, out) {
-    const output = files.map(val => { return 'file \'' + val + '\'' }).join('\n');
-    fs.writeFileSync(out, output);
-}
-
 
 module.exports = {
-    download,
     getVideoInfo,
-    merge,
+    queryDownloadUrl,
+    getUsername,
 }

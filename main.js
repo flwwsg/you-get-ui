@@ -1,10 +1,11 @@
 // const log = require('why-is-node-running');
-const { app, BrowserWindow, ipcMain, session, dialog } = require('electron');
-const { download, getVideoInfo, merge } = require('./downloader');
-const { getContent, buildHeaders, retrySaveContent } = require('./utils/net');
-const { channelName } = require('./utils/constants');
-
 const fs = require('fs');
+const { app, BrowserWindow, ipcMain, session, dialog } = require('electron');
+const { getVideoInfo, queryDownloadUrl, getUsername } = require('./extractor/bilibili');
+const { buildHeaders, saveContents } = require('./utils/net');
+const { channelName, userAgent } = require('./utils/constants');
+const { retryFunc } = require('./utils/common');
+const { merge } = require("./utils/video");
 
 let mainWindow;
 // 貌似不需要 cookies 也能下载高清视频...,这就很尴尬了
@@ -87,11 +88,81 @@ ipcMain.on(channelName.downloadSelected, async (event, videoTitle, pList, parts)
             partsName[item] = parts[i];
         }
     });
-    await downloadP();
+    await download();
 })
 
-async function downloadP() {
-    // 同时下载的个数为1, 多个下载会死机... FIXME
+ipcMain.on(channelName.login, () => {
+    const url = 'https://passport.bilibili.com/login';
+    const loginWindow = new BrowserWindow({
+            webPreferences: {
+                nodeIntegration: true,
+            }
+        })
+    loginWindow.loadURL(url, {
+        userAgent,
+    }).then(() => {
+        const waitForLogin = setInterval(() => {
+            const nextUrl = loginWindow.webContents.getURL();
+            // const agent = loginWindow.webContents.getUserAgent();
+            // console.log(nextUrl, agent);
+            if (nextUrl === url) {
+                // 未登录
+                console.log('please login...');
+            } else {
+                // 登录成功
+                clearInterval(waitForLogin);
+                loginWindow.close();
+                // 通知 renderer 更新页面
+                mainWindow.webContents.send(channelName.loginSuccess);
+            }
+        }, 2000);
+
+    }).catch(err => {
+        // 肯定是已经登录成功了
+        console.error(err);
+        loginWindow.on('ready-to-show', () => {
+            // 拼接 cookie, 获取昵称
+            getUsername(session).then(uname => {
+                mainWindow.webContents.send(channelName.loginSuccess, uname);
+            });
+            loginWindow.close();
+        });
+    })
+})
+
+ipcMain.on(channelName.changeSavePath, async () => {
+    const files = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openDirectory'],
+    });
+    if (files.canceled) {
+        return;
+    }
+    // 通知页面保存文件路径
+    saveDir = files.filePaths[0];
+    mainWindow.webContents.send(channelName.displaySavePath, files.filePaths[0]);
+})
+
+// 合并视频
+async function mergeMovie(p) {
+    const conf = downloading[p];
+    if (undefined === conf || failedParts.includes(p)) {
+        // 肯定是被跳过了
+        return;
+    }
+    conf.count ++;
+    if (conf.count !== conf.filePath.length) {
+        // 只在最后一个 promise 内合并
+        return;
+    }
+    await merge(conf.filePath, conf.saveName);
+    downloaded.push(p);
+    delete downloading[p];
+    await download();
+}
+
+
+async function download() {
+    // 同时下载的个数为多个时,下载会死机... FIXME
     if (needDownload.length > 0) {
         const remain = 3 - Object.keys(downloading).length;
         if (remain < 1) {
@@ -122,9 +193,20 @@ async function downloadP() {
                 count: 0,
             };
             // bestSource = { container: '扩展名', quality: '品质', src: [[下载地址列表]], size: 总大小 }
-            const bestSource = await retryDownload(next, download, downloadUrl, title, parseInt(next), mainWindow);
+            const res = await retryFunc(5, queryDownloadUrl, downloadUrl, title, parseInt(next), mainWindow);
+            if (!res[1]) {
+                // 下载失败, 跳过
+                // 失败了,先下载别的.等待下一次循环
+                failedParts.push(next);
+                delete downloading[next];
+                console.error('skip', next);
+                r--;
+                continue;
+            }
+            const bestSource = res[0];
             if (bestSource === null || bestSource.size === 0) {
                 // 跳过这个视频
+                console.error('error query url', next, 'skip');
                 r--;
                 continue;
             }
@@ -136,144 +218,20 @@ async function downloadP() {
             downloading[next].filePath = Array.from({length: bestSource.src.length},
                 ((v, i) => `${saveDir}/${title}[${i}]${partsName[next]}.${ext}`));
             downloading[next].saveName = `${saveDir}/${title}${partsName[next]}.${ext}`;
-            try {
-                for (let i = 0; i < bestSource.src.length; i++) {
-                    if (ext === 'flv') {
-                        await retrySaveContent(mainWindow, i, bestSource.src[i], headers, downloading[next], mergeMovie);
-                    } else if (ext === 'mp4') {
-                        await retrySaveContent(mainWindow, i, bestSource.src[i][0], headers, downloading[next], mergeMovie);
-                    }
+            for (let i = 0; i < bestSource.src.length; i++) {
+                const res = await retryFunc(5, saveContents, mainWindow, i, bestSource.src[i], headers, downloading[next], mergeMovie);
+                if (!res[1]) {
+                    // 下载失败了
+                    failedParts.push(next);
+                    delete downloading[next];
+                    console.error('skip', next);
                 }
-            } catch (e) {
-                // 失败了,
-                failedParts.push(next);
-                delete downloading[next];
-                console.error('skip', next);
             }
         }
 
     }
 }
 
-// 重试
-// downloadUrl, title, next, mainWindow
-async function retryDownload(next, cb, ...args) {
-    for (let i = 0; i < 5; i++) {
-        try {
-            console.debug('try', next, i, 'times')
-            const bestSource = await cb(...args);
-            if (bestSource) {
-                return bestSource;
-            }
-        } catch (error) {
-            if (error.response) {
-                console.log(error.response.data);
-                console.log(error.response.status);
-                console.log(error.response.headers);
-            } else if (error.request) {
-                console.log(error.request);
-            } else {
-                console.log('Error', error.message);
-            }
-            console.log(error);
-        }
-    }
-    // 失败了,先下载别的.等待下一次循环
-    failedParts.push(next);
-    delete downloading[next];
-    console.error('skip', next);
-    // needDownload.push(next);
-    return null;
-}
-
-// 合并视频
-async function mergeMovie(p) {
-    const conf = downloading[p];
-    if (undefined === conf || failedParts.includes(p)) {
-        // 肯定是被跳过了
-        return;
-    }
-    conf.count ++;
-    if (conf.count !== conf.filePath.length) {
-        // 只在最后一个 promise 内合并
-        return;
-    }
-    await merge(conf.filePath, conf.saveName);
-    downloaded.push(p);
-    delete downloading[p];
-    await downloadP();
-}
-
-ipcMain.on(channelName.login, () => {
-    const url = 'https://passport.bilibili.com/login';
-    const loginWindow = new BrowserWindow({
-            webPreferences: {
-                nodeIntegration: true,
-                // enableRemoteModule: true,
-            }
-        })
-    loginWindow.loadURL(url, {
-        userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Safari/537.36'
-    }).then(res => {
-        const waitForLogin = setInterval(() => {
-            const nextUrl = loginWindow.webContents.getURL();
-            const agent = loginWindow.webContents.getUserAgent();
-            // console.log(nextUrl, agent);
-            if (nextUrl === url) {
-                // 未登录
-                console.log('please login...');
-            } else {
-                // 登录成功
-                clearInterval(waitForLogin);
-                loginWindow.close();
-                // 通知 renderer 更新页面
-                mainWindow.webContents.send('login-success');
-            }
-        }, 2000);
-
-    }).catch(err => {
-        // 肯定是已经登录成功了
-        console.error(err);
-        loginWindow.on('ready-to-show', () => {
-            // 拼接 cookie, 获取昵称
-            getUsername();
-            loginWindow.close();
-        });
-    })
-})
-
-ipcMain.on(channelName.changeSavePath, async () => {
-    const files = await dialog.showOpenDialog(mainWindow, {
-        properties: ['openDirectory'],
-    });
-    if (files.canceled) {
-        return;
-    }
-    // 通知页面保存文件路径
-    saveDir = files.filePaths[0];
-    mainWindow.webContents.send(channelName.displaySavePath, files.filePaths[0]);
-})
-
-function getUsername() {
-    session.defaultSession.cookies.get({domain: '.bilibili.com'}).then(res => {
-        const list = [];
-        res.filter(value => {
-            if (value.path === '/') {
-                list.push(`${value.name}=${value.value}`);
-            }
-        })
-        cookies = list.join('; ');
-        console.log(cookies);
-        buildHeaders('https://www.bilibili.com', cookies).then( res => {
-            getContent('https://api.bilibili.com/x/web-interface/nav', res).then( data => {
-                mainWindow.webContents.send(channelName.loginSuccess, data.data.uname);
-            })
-        });
-        return cookies;
-    }).catch(err => {
-        console.error(err);
-    })
-}
 process.on('uncaughtException', function (err) {
     console.error('get uncaught exception', err.stack);
 })
