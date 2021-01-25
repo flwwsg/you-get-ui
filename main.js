@@ -1,4 +1,7 @@
+'use strict';
+
 const log = require('why-is-node-running');
+const hd = require('heapdump');
 const fs = require('fs');
 const { app, BrowserWindow, ipcMain, session, dialog } = require('electron');
 const { getVideoInfo, queryDownloadUrl, getUsername } = require('./extractor/bilibili');
@@ -240,3 +243,9 @@ process.on('uncaughtException', function (err) {
 setInterval(function () {
     log() // logs out active handles that are keeping node running
 }, 10000)
+
+function writeSnapshot() {
+    hd.writeSnapshot(path.join(path.join(__dirname, 'tmp'), Date.now().toString()+'.heapsnapshot'));
+}
+// TODO
+// kill -USR2 <pid> ,记录内存使用
