@@ -1,5 +1,6 @@
 'use strict';
 const { getContent, buildHeaders, getSize } = require('./utils/net');
+const { channelName } = require('./utils/constants');
 const cheerio = require('cheerio');
 const htmlparser2 = require('htmlparser2');
 const crypto = require('crypto');

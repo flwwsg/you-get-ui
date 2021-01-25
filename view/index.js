@@ -1,4 +1,5 @@
 const { ipcRenderer } = require('electron');
+const { channelName } = require('../utils/constants');
 
 const inputUrl = document.querySelector('#input-url');
 const searchIcon = document.querySelector('.ui-icon-search');
@@ -51,7 +52,7 @@ clearBtn.addEventListener('click', () => {
 downloadBtn.addEventListener('click', () => {
     downloadBtn.disabled = true;
     clearBtn.disabled = true;
-    ipcRenderer.send('download-selected', videoTitle.value, checked, checkedParts);
+    ipcRenderer.send(channelName.downloadSelected, videoTitle.value, checked, checkedParts);
 });
 
 // update current path
@@ -61,25 +62,25 @@ if (localStorage.getItem('savePath')) {
     currentPath.innerHTML = '视频默认保存在当前目录,点击按钮更新路径'
 }
 searchIcon.addEventListener('click', () => {
-    ipcRenderer.send('get-video-info', inputUrl.value, currentPath.innerHTML);
+    ipcRenderer.send(channelName.queryVideoInfo, inputUrl.value, currentPath.innerHTML);
 })
 
 loginAction.addEventListener('click', (event) => {
     event.preventDefault();
-    ipcRenderer.send('login');
+    ipcRenderer.send(channelName.login);
 })
 
 // 打开文件保存对话框
 updatePath.addEventListener('click', () => {
-    ipcRenderer.send('update-path');
+    ipcRenderer.send(channelName.changeSavePath);
 })
 
-ipcRenderer.on('render-save-path', (event, filePath) => {
+ipcRenderer.on(channelName.displaySavePath, (event, filePath) => {
     localStorage.setItem('savePath', filePath);
     currentPath.innerHTML = filePath;
 });
 
-ipcRenderer.on('set-titles', (event, parts, title) => {
+ipcRenderer.on(channelName.updateTitle, (event, parts, title) => {
     let index = 0;
     // start download
     if (tbl.getElementsByTagName('tbody').length > 0) {
@@ -105,19 +106,19 @@ ipcRenderer.on('set-titles', (event, parts, title) => {
     videoTitle.value = title;
 });
 
-ipcRenderer.on('downloading', (event, index, downloadSize, totalSize) => {
+ipcRenderer.on(channelName.downloading, (event, index, downloadSize, totalSize) => {
     const el = document.querySelector(`#progress${index}`);
     el.value = Number(downloadSize/totalSize).toFixed(2);
 });
 
-ipcRenderer.on('error-download', (event, msg) => {
+ipcRenderer.on(channelName.downloadFailed, (event, msg) => {
     inputUrl.readOnly = false;
     inputUrl.value = '';
 })
 
 
 // 登录成功, 构建 cookie, header
-ipcRenderer.on('login-success', (event, uname) => {
+ipcRenderer.on(channelName.loginSuccess, (event, uname) => {
     // 移除登录按钮
     loginAction.parentNode.removeChild(loginAction);
     hello.innerHTML =  'hi, '+uname;

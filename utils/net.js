@@ -2,6 +2,8 @@
 
 const fs = require('fs');
 const axios = require('axios');
+const { channelName } = require('./constants');
+
 const httpClient = axios.create();
 // 超时3秒
 httpClient.defaults.timeout = 3000;
@@ -72,7 +74,7 @@ const retrySaveContent = async function(currentWindow, index, url, urlHeaders, c
             conf.partial[index] += chunk.length;
             let s = 0;
             conf.partial.forEach( val => s += val);
-            currentWindow.webContents.send('downloading', conf.p, s, conf.totalSize);
+            currentWindow.webContents.send(channelName.downloading, conf.p, s, conf.totalSize);
         });
 
         const writer = fs.createWriteStream(filepath);

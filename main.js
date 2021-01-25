@@ -2,6 +2,8 @@
 const { app, BrowserWindow, ipcMain, session, dialog } = require('electron');
 const { download, getVideoInfo, merge } = require('./downloader');
 const { getContent, buildHeaders, retrySaveContent } = require('./utils/net');
+const { channelName } = require('./utils/constants');
+
 const fs = require('fs');
 
 let mainWindow;
@@ -41,7 +43,7 @@ app.on('ready', () => {
 });
 
 // 从页面接收url
-ipcMain.on('get-video-info', async (event, url, currentPath) => {
+ipcMain.on(channelName.queryVideoInfo, async (event, url, currentPath) => {
     if (needDownload.length > 0 || Object.keys(downloading).length > 0) {
         await dialog.showMessageBox(mainWindow, {
             title: '下载中,请稍等',
@@ -66,18 +68,18 @@ ipcMain.on('get-video-info', async (event, url, currentPath) => {
         const title = res.title;
         const parts = res.parts;
         baseUrl = res.baseUrl;
-        mainWindow.webContents.send('set-titles', parts, title);
+        mainWindow.webContents.send(channelName.updateTitle, parts, title);
     } else {
         await dialog.showMessageBox(mainWindow, {
             title: 'tips',
             message: '不支持的地址',
         });
-        mainWindow.webContents.send('error-download');
+        mainWindow.webContents.send(channelName.downloadFailed);
     }
 })
 
 // 下载所选
-ipcMain.on('download-selected', async (event, videoTitle, pList, parts) => {
+ipcMain.on(channelName.downloadSelected, async (event, videoTitle, pList, parts) => {
     title = videoTitle.replace(/[\/\\]/g, '-');
     pList.forEach((item, i) => {
         if (!downloaded.includes(item) && !downloading[item]) {
@@ -202,7 +204,7 @@ async function mergeMovie(p) {
     await downloadP();
 }
 
-ipcMain.on('login', () => {
+ipcMain.on(channelName.login, () => {
     const url = 'https://passport.bilibili.com/login';
     const loginWindow = new BrowserWindow({
             webPreferences: {
@@ -240,7 +242,7 @@ ipcMain.on('login', () => {
     })
 })
 
-ipcMain.on('update-path', async () => {
+ipcMain.on(channelName.changeSavePath, async () => {
     const files = await dialog.showOpenDialog(mainWindow, {
         properties: ['openDirectory'],
     });
@@ -249,7 +251,7 @@ ipcMain.on('update-path', async () => {
     }
     // 通知页面保存文件路径
     saveDir = files.filePaths[0];
-    mainWindow.webContents.send('render-save-path', files.filePaths[0]);
+    mainWindow.webContents.send(channelName.displaySavePath, files.filePaths[0]);
 })
 
 function getUsername() {
@@ -264,9 +266,9 @@ function getUsername() {
         console.log(cookies);
         buildHeaders('https://www.bilibili.com', cookies).then( res => {
             getContent('https://api.bilibili.com/x/web-interface/nav', res).then( data => {
-                mainWindow.webContents.send('login-success', data.data.uname);
+                mainWindow.webContents.send(channelName.loginSuccess, data.data.uname);
             })
-        })
+        });
         return cookies;
     }).catch(err => {
         console.error(err);
