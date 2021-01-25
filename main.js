@@ -1,4 +1,4 @@
-// const log = require('why-is-node-running');
+const log = require('why-is-node-running');
 const fs = require('fs');
 const { app, BrowserWindow, ipcMain, session, dialog } = require('electron');
 const { getVideoInfo, queryDownloadUrl, getUsername } = require('./extractor/bilibili');
@@ -236,7 +236,7 @@ process.on('uncaughtException', function (err) {
     console.error('get uncaught exception', err.stack);
 })
 
-// // 检测保存运行node的进程
-// setInterval(function () {
-//     log() // logs out active handles that are keeping node running
-// }, 10000)
+// 检测保存运行node的进程
+setInterval(function () {
+    log() // logs out active handles that are keeping node running
+}, 10000)
