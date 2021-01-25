@@ -9,6 +9,7 @@ const updatePath = document.querySelector('#updatePathBtn');
 const currentPath = document.querySelector('#currentPath');
 const videoTitle = document.querySelector('#videoTitle');
 const downloadBtn = document.querySelector('#downloadBtn');
+const clearBtn = document.querySelector('#clearBtn');
 
 let checked = [];
 const partsName = {};
@@ -19,6 +20,7 @@ const mixTable = new Table(tbl, {
     onCheck: function ( isAllChecked, isAllUnchecked, eleCheckbox, eleAllTdCheckbox) {
         // console.log( isAllChecked, isAllUnchecked, eleCheckbox, eleCheckbox.checked);
         downloadBtn.disabled = false;
+        clearBtn.disabled = false;
         checked = [];
         checkedParts = [];
         for (const ele of eleAllTdCheckbox) {
@@ -34,8 +36,21 @@ const mixTable = new Table(tbl, {
     },
 });
 
+// 删除选中的内容
+clearBtn.addEventListener('click', () => {
+    const body = tbl.getElementsByTagName('tbody')[0];
+    checked.forEach( value => {
+        const chk = document.querySelector('#chk'+value);
+        // 删除 tr 节点
+        body.removeChild(chk.parentNode.parentNode);
+    });
+    checked = [];
+    checkedParts = [];
+});
+
 downloadBtn.addEventListener('click', () => {
     downloadBtn.disabled = true;
+    clearBtn.disabled = true;
     ipcRenderer.send('download-selected', videoTitle.value, checked, checkedParts);
 });
 
