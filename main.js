@@ -1,14 +1,15 @@
 'use strict';
 
 const log = require('why-is-node-running');
-const hd = require('heapdump');
+// const hd = require('heapdump');
 const fs = require('fs');
-const { app, BrowserWindow, ipcMain, session, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, session, dialog, Tray, Menu } = require('electron');
 const { getVideoInfo, queryDownloadUrl, getUsername } = require('./extractor/bilibili');
 const { buildHeaders, saveContents } = require('./utils/net');
 const { channelName, userAgent } = require('./utils/constants');
 const { retryFunc } = require('./utils/common');
 const { merge } = require("./utils/video");
+const path = require('path');
 
 let mainWindow;
 // 貌似不需要 cookies 也能下载高清视频...,这就很尴尬了
@@ -26,9 +27,10 @@ const downloading = {};
 const partsName = {};
 let failedParts = [];
 let saveDir = '';
+let tray;
 
 // 启动app
-app.on('ready', () => {
+app.whenReady().then( () => {
     // createWindow
     mainWindow = new BrowserWindow({
         show: false,
@@ -38,13 +40,37 @@ app.on('ready', () => {
         },
         width: 700,
         height: 800,
-    })
+    });
     mainWindow.loadFile(`${__dirname}/view/index.html`);
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
         // mainWindow.openDevTools();
+    });
+
+    // 设置托盘
+    tray = new Tray(path.join(__dirname, 'view', 'download.png'));
+    tray.setToolTip('downloader');
+    const contextMenu = Menu.buildFromTemplate([
+        // 退出
+        {
+            label: 'Exit',
+            type: 'normal',
+            role: 'quit',
+        }
+    ])
+    tray.setContextMenu(contextMenu);
+    tray.on('click', () => {
+        mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show();
     })
+    // 关闭窗口时,不退出
+    mainWindow.on('close', event => {
+        if (mainWindow.isVisible()) {
+            event.preventDefault();
+            mainWindow.hide();
+        }
+    });
 });
+
 
 // 从页面接收url
 ipcMain.on(channelName.queryVideoInfo, async (event, url, currentPath) => {
@@ -244,8 +270,8 @@ setInterval(function () {
     log() // logs out active handles that are keeping node running
 }, 10000)
 
-function writeSnapshot() {
-    hd.writeSnapshot(path.join(path.join(__dirname, 'tmp'), Date.now().toString()+'.heapsnapshot'));
-}
+// function writeSnapshot() {
+//     hd.writeSnapshot(path.join(path.join(__dirname, 'tmp'), Date.now().toString()+'.heapsnapshot'));
+// }
 // TODO
 // kill -USR2 <pid> ,记录内存使用
