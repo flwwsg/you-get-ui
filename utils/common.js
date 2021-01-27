@@ -17,7 +17,7 @@ const retryFunc = async function(count, asyncCallback, ...args) {
         return [ res, true ];
     } catch (e) {
         console.error('execute asyncCallback failed', e.stack);
-        return retryFunc(count--, asyncCallback, ...args);
+        return retryFunc(count-1, asyncCallback, ...args);
     }
 };
 
