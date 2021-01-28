@@ -141,9 +141,10 @@ async function getVideoInfo(url) {
  * @param title
  * @param p
  * @param currentWindow
+ * @param logger
  * @returns {Promise<null|{size: number}>}
  */
-async function queryDownloadUrl(url, title, p, currentWindow) {
+async function queryDownloadUrl(url, title, p, currentWindow, logger) {
     // 下载的地址
     const streams = {};
     const dashStreams = {};
@@ -151,19 +152,18 @@ async function queryDownloadUrl(url, title, p, currentWindow) {
     let bestDashStream = { size: 0};
     // get initial_state and playInfo
     let headers = await buildHeaders();
+    logger.debug('get html content', p);
     let htmlContent = await getContent(url, headers);
     let dom = htmlparser2.parseDocument(htmlContent);
     let root = cheerio.load(dom);
     const initialState = await getInitialState(root);
     const playInfo = await getPlayInfo(root);
-
     if (!initialState) {
         console.error('get initialState or playInfo error');
         process.exit(1);
     }
     // console.log(initialState);
     // console.log(playInfo);
-
     if (playInfo === null) {
         console.error('get playInfo fail');
         process.exit(1);
@@ -183,39 +183,41 @@ async function queryDownloadUrl(url, title, p, currentWindow) {
     if (playInfo) {
         playInfos.push(playInfo);
     }
-    // get format from api
-    for (const qn of [120, 112, 80, 64, 32, 16]) {
-        if(!currentQuality || qn < currentQuality) {
-            const apiUrl = await bilibiliApi(avid, cid, qn);
-            headers = await buildHeaders(url);
-            const apiPlayInfo = await getContent(apiUrl, headers);
-            if (apiPlayInfo.code === 0) {
-                // success
-                playInfos.push(apiPlayInfo);
-            } else {
-                console.error('query bilibili api fail with', apiPlayInfo);
-            }
-        }
-
-        if (!bestQuality || qn <= bestQuality) {
-            const apiUrl = await bilibiliInterfaceApi(cid, qn);
-            headers = await buildHeaders(url);
-            const apiPlayInfoData = await getContent(apiUrl, headers);
-            if (apiPlayInfoData.quality) {
-                playInfos.push({
-                    code: 0,
-                    message: 0,
-                    ttl: 1,
-                    data: apiPlayInfoData
-                });
-            }
-        }
-    }
+    // // get format from api 貌似不需要
+    // for (const qn of [120, 112, 80, 64, 32, 16]) {
+    //     if(!currentQuality || qn < currentQuality) {
+    //         const apiUrl = await bilibiliApi(avid, cid, qn);
+    //         headers = await buildHeaders(url);
+    //         logger.debug('get api player info content', p, qn);
+    //         const apiPlayInfo = await getContent(apiUrl, headers);
+    //         if (apiPlayInfo.code === 0) {
+    //             // success
+    //             playInfos.push(apiPlayInfo);
+    //         } else {
+    //             logger.error('query bilibili api fail with', apiPlayInfo);
+    //         }
+    //     }
+    //
+    //     if (!bestQuality || qn <= bestQuality) {
+    //         const apiUrl = await bilibiliInterfaceApi(cid, qn);
+    //         headers = await buildHeaders(url);
+    //         logger.debug('get api player info interface content', p, qn);
+    //         const apiPlayInfoData = await getContent(apiUrl, headers);
+    //         if (apiPlayInfoData.quality) {
+    //             playInfos.push({
+    //                 code: 0,
+    //                 message: 0,
+    //                 ttl: 1,
+    //                 data: apiPlayInfoData
+    //             });
+    //         }
+    //     }
+    // }
     if (!playInfos) {
         console.error('try get play info fail.');
         process.exit(1);
     }
-
+    logger.debug('query', p, 'play infos', JSON.stringify(playInfos));
     for (const info of playInfos) {
         const quality = info.data.quality;
         const formatId = streamQualities[quality].id;
@@ -248,6 +250,7 @@ async function queryDownloadUrl(url, title, p, currentWindow) {
                 const audioQuality = s.audio_quality;
                 const baseUrl = video.baseUrl;
                 headers = await buildHeaders(url);
+                logger.debug('get size of', p, baseUrl);
                 let size = await getSize(baseUrl, headers);
                 // audio track
                 if (info.data.dash.audio) {
@@ -260,6 +263,7 @@ async function queryDownloadUrl(url, title, p, currentWindow) {
                     }
                     if (!audioSizeCache[audioQuality]) {
                         headers = await buildHeaders(url)
+                        logger.debug('get audio size of', p, audioBaseUrl);
                         audioSizeCache[audioQuality] = await getSize(audioBaseUrl, headers);
                     }
                     size += audioSizeCache[audioQuality];
@@ -298,7 +302,7 @@ async function queryDownloadUrl(url, title, p, currentWindow) {
     }
     // console.debug(streams);
     // console.debug(dashStreams);
-    // console.debug(bestStream, bestDashStream);
+    logger.debug('query', p, 'best stream', JSON.stringify(bestStream),  'best dash stream', JSON.stringify(bestDashStream));
     if (bestDashStream.size > 0) {
         // 归一化,src 字段
         bestDashStream.src = bestDashStream.src.map(value => {

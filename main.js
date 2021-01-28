@@ -1,6 +1,24 @@
 'use strict';
 
 const log = require('why-is-node-running');
+const log4js = require('log4js');
+log4js.configure({
+    appenders: {
+        downloader: {
+            type: 'file',
+            filename: 'downloader.log',
+        }
+    },
+    categories: {
+        default: {
+            appenders: ['downloader'],
+            level: 'all',
+        }
+    },
+});
+const logger = log4js.getLogger('downloader');
+logger.level = 'debug';
+
 // const hd = require('heapdump');
 const fs = require('fs');
 const { app, BrowserWindow, ipcMain, session, dialog, Tray, Menu } = require('electron');
@@ -178,7 +196,8 @@ async function mergeMovie(p) {
         // 肯定是被跳过了
         return;
     }
-    conf.count ++;
+    // 需要加锁,不加锁会造成竞争,丢失下载的文件,导致不能合并
+    conf.count += 1;
     if (conf.count !== conf.filePath.length) {
         // 只在最后一个 promise 内合并
         return;
@@ -192,83 +211,85 @@ async function mergeMovie(p) {
 
 async function download() {
     // 同时下载的个数为多个时,下载会死机... FIXME
-    if (needDownload.length > 0) {
-        const remain = 3 - Object.keys(downloading).length;
-        if (remain < 1) {
-            return;
+    const remain = 5 - Object.keys(downloading).length;
+    if (remain < 1) {
+        return;
+    }
+    for(let r = 0; r < remain; r++) {
+        const next = needDownload.shift();
+        if (undefined === next) {
+            // 没有东西了
+            break;
         }
-        for(let r = 0; r < remain; r++) {
-            const next = needDownload.shift();
-            if (undefined === next) {
-                // 没有东西了
-                break;
-            }
-            if (failedParts.includes(next)) {
-                // 删除之前失败的视频
-                const index = failedParts.indexOf(next);
-                failedParts = [].concat(failedParts.slice(0, index), failedParts.slice(index + 1, failedParts.length));
-            }
-            const downloadUrl = baseUrl+'?p='+next;
-            console.debug('downloading', downloadUrl);
-            downloading[next] = {
-                // 临时保存的文件路径
-                filePath: [],
-                // 下载的临时数据
-                partial: [],
-                totalSize: 0,
-                p: next,
-                // 最后保存的路径
-                saveName: '',
-                count: 0,
-            };
-            // bestSource = { container: '扩展名', quality: '品质', src: [[下载地址列表]], size: 总大小 }
-            const res = await retryFunc(5, queryDownloadUrl, downloadUrl, title, parseInt(next), mainWindow);
+        if (failedParts.includes(next)) {
+            // 删除之前失败的视频
+            const index = failedParts.indexOf(next);
+            failedParts = [].concat(failedParts.slice(0, index), failedParts.slice(index + 1, failedParts.length));
+        }
+        const downloadUrl = baseUrl+'?p='+next;
+        logger.debug('downloading', downloadUrl);
+        downloading[next] = {
+            // 临时保存的文件路径
+            filePath: [],
+            // 下载的临时数据
+            partial: [],
+            totalSize: 0,
+            p: next,
+            // 最后保存的路径
+            saveName: '',
+            count: 0,
+            // debug 记录
+            bestSource: false ,
+        };
+        // bestSource = { container: '扩展名', quality: '品质', src: [[下载地址列表]], size: 总大小 }
+        const res = await retryFunc(logger, 5, queryDownloadUrl, downloadUrl, title, parseInt(next), mainWindow, logger);
+        if (!res[1]) {
+            // 下载失败, 跳过
+            // 失败了,先下载别的.等待下一次循环
+            failedParts.push(next);
+            delete downloading[next];
+            logger.error('skip', next);
+            r--;
+            continue;
+        }
+        const bestSource = res[0];
+        logger.debug('best source for', next, bestSource);
+        downloading[next].bestSource = bestSource;
+        if (bestSource === null || bestSource.size === 0) {
+            // 跳过这个视频
+            logger.error('error query url', next, 'skip');
+            r--;
+            continue;
+        }
+        downloading[next].totalSize = bestSource.size;
+        downloading[next].partial = Array.from({length: bestSource.src.length}, (() => 0));
+        // downloading[next].count = Array.from({length: bestSource.src.length}, (() => 0));
+        // console.debug(JSON.stringify(bestSource));
+        const ext = bestSource.container;
+        const headers = await buildHeaders(downloadUrl);
+        downloading[next].filePath = Array.from({length: bestSource.src.length},
+            ((v, i) => `${saveDir}/${title}[${i}]${partsName[next]}.${ext}`));
+        downloading[next].saveName = `${saveDir}/${title}${partsName[next]}.${ext}`;
+        for (let i = 0; i < bestSource.src.length; i++) {
+            const res = await retryFunc(logger, 5, saveContents, mainWindow, i, bestSource.src[i], headers, downloading[next], mergeMovie);
             if (!res[1]) {
-                // 下载失败, 跳过
-                // 失败了,先下载别的.等待下一次循环
+                // 下载失败了
                 failedParts.push(next);
                 delete downloading[next];
-                console.error('skip', next);
-                r--;
-                continue;
-            }
-            const bestSource = res[0];
-            if (bestSource === null || bestSource.size === 0) {
-                // 跳过这个视频
-                console.error('error query url', next, 'skip');
-                r--;
-                continue;
-            }
-            downloading[next].totalSize = bestSource.size;
-            downloading[next].partial = Array.from({length: bestSource.src.length}, (() => 0));
-            // console.debug(JSON.stringify(bestSource));
-            const ext = bestSource.container;
-            const headers = await buildHeaders(downloadUrl);
-            downloading[next].filePath = Array.from({length: bestSource.src.length},
-                ((v, i) => `${saveDir}/${title}[${i}]${partsName[next]}.${ext}`));
-            downloading[next].saveName = `${saveDir}/${title}${partsName[next]}.${ext}`;
-            for (let i = 0; i < bestSource.src.length; i++) {
-                const res = await retryFunc(5, saveContents, mainWindow, i, bestSource.src[i], headers, downloading[next], mergeMovie);
-                if (!res[1]) {
-                    // 下载失败了
-                    failedParts.push(next);
-                    delete downloading[next];
-                    console.error('skip', next);
-                }
+                logger.error('skip', next);
             }
         }
-
     }
 }
 
 process.on('uncaughtException', function (err) {
-    console.error('get uncaught exception', err.stack);
+    logger.error('get uncaught exception', err.stack);
 })
 
-// 检测保存运行node的进程
-setInterval(function () {
-    log() // logs out active handles that are keeping node running
-}, 10000)
+// // 检测保存运行node的进程
+// setInterval(function () {
+//     log() // logs out active handles that are keeping node running
+// }, 10000)
 
 // function writeSnapshot() {
 //     hd.writeSnapshot(path.join(path.join(__dirname, 'tmp'), Date.now().toString()+'.heapsnapshot'));
