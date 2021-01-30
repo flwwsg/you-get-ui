@@ -3,14 +3,7 @@
 const fs = require('fs');
 const axios = require('axios');
 const { channelName, userAgent } = require('./constants');
-
-// 获取 http 链接
-const getClient = (timeout) => {
-    const httpClient = axios.create();
-    // 超时3秒
-    httpClient.defaults.timeout = timeout || 10000;
-    return httpClient;
-}
+const { retryFunc } = require('./common');
 
 /**
  * 获取get 请求
@@ -21,7 +14,6 @@ const getContent = async function (url, headers) {
     const content = await axios({
         url,
         method: 'get',
-        timeout: 10*1000,
         headers,
     });
     return content.data;
@@ -53,7 +45,6 @@ const getSize = async function(url, headers) {
     const source = cancelToken.source();
     const content = await axios({
         url,
-        timeout: 10*1000,
         headers,
         // 只需要知道长度
         responseType: "stream",
@@ -66,14 +57,13 @@ const getSize = async function(url, headers) {
 }
 
 // 下载视频, TODO 支持断点续传
+// 单独处理，不能使用 retry
 const saveContents = async function(currentWindow, index, url, urlHeaders, conf, cb) {
-    const { data } = await getClient().request({
+    const { data } = await axios({
         url,
         method: 'GET',
         responseType: 'stream',
         headers: urlHeaders,
-        // 5s
-        timeout: 1000 * 10,
     });
     const filepath = conf.filePath[index];
     data.on('data', chunk => {
@@ -91,11 +81,24 @@ const saveContents = async function(currentWindow, index, url, urlHeaders, conf,
         });
     });
     // onDownloadProgress 只支持 xhr
+    return data;
+}
+
+const retryGetContents = async function(url, headers) {
+    return retryFunc(console, 5, getContent, url, headers);
+}
+
+const retryGetSize = async function(url, headers) {
+    return retryFunc(console, 5, getSize, url, headers);
+}
+
+const retrySaveContents = async function(logger, currentWindow, index, url, headers, conf, cb) {
+    return retryFunc(logger, 5, saveContents, currentWindow, index, url, headers, conf, cb);
 }
 
 module.exports = {
-    getContent,
     buildHeaders,
-    getSize,
-    saveContents,
+    retryGetContents,
+    retryGetSize,
+    retrySaveContents,
 }

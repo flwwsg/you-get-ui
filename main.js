@@ -1,6 +1,6 @@
 'use strict';
 
-const log = require('why-is-node-running');
+// const log = require('why-is-node-running');
 const log4js = require('log4js');
 log4js.configure({
     appenders: {
@@ -19,11 +19,10 @@ log4js.configure({
 const logger = log4js.getLogger('downloader');
 logger.level = 'debug';
 
-// const hd = require('heapdump');
 const fs = require('fs');
 const { app, BrowserWindow, ipcMain, session, dialog, Tray, Menu } = require('electron');
 const { getVideoInfo, queryDownloadUrl, getUsername } = require('./extractor/bilibili');
-const { buildHeaders, saveContents } = require('./utils/net');
+const { buildHeaders, retrySaveContents } = require('./utils/net');
 const { channelName, userAgent } = require('./utils/constants');
 const { retryFunc } = require('./utils/common');
 const { merge } = require("./utils/video");
@@ -210,8 +209,8 @@ async function mergeMovie(p) {
 
 
 async function download() {
-    // 同时下载的个数为多个时,下载会死机... FIXME
-    const remain = 5 - Object.keys(downloading).length;
+    // 同时下载的个数为多个时,服务器不会下发数据。。。，无解
+    const remain = 1 - Object.keys(downloading).length;
     if (remain < 1) {
         return;
     }
@@ -271,7 +270,7 @@ async function download() {
             ((v, i) => `${saveDir}/${title}[${i}]${partsName[next]}.${ext}`));
         downloading[next].saveName = `${saveDir}/${title}${partsName[next]}.${ext}`;
         for (let i = 0; i < bestSource.src.length; i++) {
-            const res = await retryFunc(logger, 5, saveContents, mainWindow, i, bestSource.src[i], headers, downloading[next], mergeMovie);
+            const res = await retrySaveContents(logger, mainWindow, i, bestSource.src[i], headers, downloading[next], mergeMovie);
             if (!res[1]) {
                 // 下载失败了
                 failedParts.push(next);

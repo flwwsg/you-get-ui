@@ -1,5 +1,5 @@
 'use strict';
-const { getContent, buildHeaders, getSize } = require('../utils/net');
+const { buildHeaders, retryGetContents, retryGetSize } = require('../utils/net');
 const cheerio = require('cheerio');
 const htmlparser2 = require('htmlparser2');
 const crypto = require('crypto');
@@ -116,7 +116,8 @@ async function getVideoInfo(url) {
     }
     // get initial_state and playInfo
     let headers = await buildHeaders();
-    let htmlContent = await getContent(url, headers);
+    const res = await retryGetContents(url, headers);
+    let htmlContent = res[0];
     // console.log(httpContent);
     let dom = htmlparser2.parseDocument(htmlContent);
     let root = cheerio.load(dom);
@@ -153,7 +154,8 @@ async function queryDownloadUrl(url, title, p, currentWindow, logger) {
     // get initial_state and playInfo
     let headers = await buildHeaders();
     logger.debug('get html content', p);
-    let htmlContent = await getContent(url, headers);
+    const res = await retryGetContents(url, headers);
+    let htmlContent = res[0];
     let dom = htmlparser2.parseDocument(htmlContent);
     let root = cheerio.load(dom);
     const initialState = await getInitialState(root);
@@ -251,7 +253,9 @@ async function queryDownloadUrl(url, title, p, currentWindow, logger) {
                 const baseUrl = video.baseUrl;
                 headers = await buildHeaders(url);
                 logger.debug('get size of', p, baseUrl);
-                let size = await getSize(baseUrl, headers);
+                let size = 0;
+                const res = await retryGetSize(baseUrl, headers);
+                size = res[0];
                 // audio track
                 if (info.data.dash.audio) {
                     let audioBaseUrl = info.data.dash.audio[0].baseUrl;
@@ -264,7 +268,8 @@ async function queryDownloadUrl(url, title, p, currentWindow, logger) {
                     if (!audioSizeCache[audioQuality]) {
                         headers = await buildHeaders(url)
                         logger.debug('get audio size of', p, audioBaseUrl);
-                        audioSizeCache[audioQuality] = await getSize(audioBaseUrl, headers);
+                        const res = await retryGetSize(audioBaseUrl, headers);
+                        audioSizeCache[audioQuality] = res[0];
                     }
                     size += audioSizeCache[audioQuality];
                     dashStreams[formatId] = {
@@ -331,7 +336,8 @@ async function getUsername(session) {
     const cookies = list.join('; ');
     console.log(cookies);
     const headers = await buildHeaders('https://www.bilibili.com', cookies);
-    const contents = await getContent('https://api.bilibili.com/x/web-interface/nav', headers);
+    const result = await retryGetContents('https://api.bilibili.com/x/web-interface/nav', headers);
+    const contents = result[0];
     return contents.data.uname;
 
 }
