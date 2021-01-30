@@ -185,36 +185,6 @@ async function queryDownloadUrl(url, title, p, currentWindow, logger) {
     if (playInfo) {
         playInfos.push(playInfo);
     }
-    // // get format from api 貌似不需要
-    // for (const qn of [120, 112, 80, 64, 32, 16]) {
-    //     if(!currentQuality || qn < currentQuality) {
-    //         const apiUrl = await bilibiliApi(avid, cid, qn);
-    //         headers = await buildHeaders(url);
-    //         logger.debug('get api player info content', p, qn);
-    //         const apiPlayInfo = await getContent(apiUrl, headers);
-    //         if (apiPlayInfo.code === 0) {
-    //             // success
-    //             playInfos.push(apiPlayInfo);
-    //         } else {
-    //             logger.error('query bilibili api fail with', apiPlayInfo);
-    //         }
-    //     }
-    //
-    //     if (!bestQuality || qn <= bestQuality) {
-    //         const apiUrl = await bilibiliInterfaceApi(cid, qn);
-    //         headers = await buildHeaders(url);
-    //         logger.debug('get api player info interface content', p, qn);
-    //         const apiPlayInfoData = await getContent(apiUrl, headers);
-    //         if (apiPlayInfoData.quality) {
-    //             playInfos.push({
-    //                 code: 0,
-    //                 message: 0,
-    //                 ttl: 1,
-    //                 data: apiPlayInfoData
-    //             });
-    //         }
-    //     }
-    // }
     if (!playInfos) {
         console.error('try get play info fail.');
         process.exit(1);
@@ -319,6 +289,19 @@ async function queryDownloadUrl(url, title, p, currentWindow, logger) {
         return bestStream
     }
 }
+//
+// //TODO 下载 bangumi
+// async function queryBangumi() {
+//     // get initial_state and playInfo
+//     let headers = await buildHeaders();
+//     logger.debug('get html content', p);
+//     const res = await retryGetContents(url, headers);
+//     let htmlContent = res[0];
+//     let dom = htmlparser2.parseDocument(htmlContent);
+//     let root = cheerio.load(dom);
+//     const initialState = await getInitialState(root);
+//     const playInfo = await getPlayInfo(root);
+// }
 
 /**
  * 获取用户名
