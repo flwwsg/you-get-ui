@@ -4,7 +4,6 @@ js重构 you-get b站部分代码,添加 ui,登录功能.
 #### TODO
 功能 | 完成度
 ---|---
-下载无响应(If the server stops sending back data, it will stall infinitely) | 0
 package 打包发布 | 0
 下载完以后,不更新进度(调试模式下暂停进程,导致进度不更新) | 0
 删除无用菜单项 | 0
@@ -20,6 +19,7 @@ package 打包发布 | 0
 替换!? 等中文文件名 | 100
 列表清除 | 100
 常驻 tray 后台 | 100
+下载无响应(If the server stops sending back data, it will stall infinitely) | 100
 
 #### timeout
 axios timeout 无效.使用node 自带 api.
